@@ -175,7 +175,7 @@ class FileSystem:
                 + i * BLOCK_SIZE
             )
 
-        return b"".join(data)
+        return b"".join(data).rstrip(b"\x00")
 
 
 if __name__ == "__main__":
@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
     file_name = "ahmed_hesham.txt"
     file_data = b"my name is H H"
-    # fs.write_file(file_name, file_data)
+    fs.write_file(file_name, file_data)
     for file in fs.list_all_files():
         print(file.file_name, file.file_blocks, file.file_start_block)
         print(fs.read_file(file))
