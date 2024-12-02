@@ -5,23 +5,30 @@ from typing import *
 from utility import reset_seek_to_zero
 
 
-class FileIndex:
-    pass
+# class FileIndex:
+#     pass
 
 
 class FileIndexNode:
-    def __init__(self, file_name: str, file_start_address: int, file_size: int) -> None:
+    def __init__(self, file_name: str, file_start_block: int, file_blocks: int) -> None:
         self.file_name: str = file_name
-        self.file_start_address: int = file_start_address
-        self.file_size: int = file_size
+        self.file_start_block: int = file_start_block
+        self.file_blocks: int = file_blocks
 
     def to_bytes(self) -> bytes:
         file_name_bytes = self.file_name.encode("utf-8").ljust(FILE_NAME_SIZE, b"\0")
         file_size_bytes = struct.pack(
-            f"{MAX_FILE_SIZE}s", str(self.file_size).encode("utf-8")
+            f"{MAX_FILE_BLOCKS}B",
+            *self.file_blocks.to_bytes(
+                MAX_FILE_BLOCKS, byteorder="big"
+            ),  # Convert to bytes
         )
+
         file_start_address_bytes = struct.pack(
-            f"{FILE_START_ADDRESS_SIZE}s", str(self.file_start_address).encode("utf-8")
+            f"{FILE_START_BLOCK_INDEX_SIZE}B",
+            *self.file_start_block.to_bytes(
+                FILE_START_BLOCK_INDEX_SIZE, byteorder="big"
+            ),  # Convert to bytes
         )
 
         return file_name_bytes + file_size_bytes + file_start_address_bytes
@@ -29,24 +36,22 @@ class FileIndexNode:
     @classmethod
     def from_bytes(cls, data: bytes) -> "FileIndexNode":
         file_name_bytes = data[:FILE_NAME_SIZE]
-        file_size_bytes = data[FILE_NAME_SIZE : FILE_NAME_SIZE + MAX_FILE_SIZE]
+        file_size_bytes = data[FILE_NAME_SIZE : FILE_NAME_SIZE + MAX_FILE_BLOCKS]
         file_start_address_bytes = data[
             FILE_NAME_SIZE
-            + MAX_FILE_SIZE : FILE_NAME_SIZE
-            + MAX_FILE_SIZE
-            + FILE_START_ADDRESS_SIZE
+            + MAX_FILE_BLOCKS : FILE_NAME_SIZE
+            + MAX_FILE_BLOCKS
+            + FILE_START_BLOCK_INDEX_SIZE
         ]
 
         file_name = file_name_bytes.lstrip(b"\0").decode("utf-8")
-        file_size = int(
-            struct.unpack(f"{MAX_FILE_SIZE}s", file_size_bytes)[0]
-            .decode("utf-8")
-            .rstrip("\0")
+        file_size = int.from_bytes(
+            struct.unpack(f"{MAX_FILE_BLOCKS}B", file_size_bytes), byteorder="big"
         )
-        file_start_address = int(
-            struct.unpack(f"{FILE_START_ADDRESS_SIZE}s", file_start_address_bytes)[0]
-            .decode("utf-8")
-            .rstrip("\0")
+
+        file_start_address = int.from_bytes(
+            struct.unpack(f"{FILE_START_BLOCK_INDEX_SIZE}B", file_start_address_bytes),
+            byteorder="big",
         )
 
         return cls(file_name, file_start_address, file_size)
@@ -93,8 +98,7 @@ class FileSystem:
     def write_file(self, file_name: str, file_data: bytes):
         num_blocks_needed = (len(file_data) + BLOCK_SIZE - 1) // BLOCK_SIZE
         free_blocks = self.find_free_space_bitmap(num_blocks_needed)
-
-        file_start_address = free_blocks[0] * BLOCK_SIZE
+        file_start_block_index = free_blocks[0]
         current_offset = 0
 
         for block in free_blocks:
@@ -111,8 +115,8 @@ class FileSystem:
 
         file_index_node = FileIndexNode(
             file_name=file_name,
-            file_start_address=file_start_address,
-            file_size=len(file_data),
+            file_start_block=file_start_block_index,
+            file_blocks=num_blocks_needed,
         )
 
         self.write_to_index(file_index_node)
@@ -139,6 +143,7 @@ class FileSystem:
 
         raise Exception("no free space")
 
+    @reset_seek_to_zero
     def list_all_files(self) -> List[FileIndexNode]:
 
         files = []
@@ -154,17 +159,31 @@ class FileSystem:
 
         return files
 
-    def read_file(self, file_name: str) -> bytes:
-        pass
+    @reset_seek_to_zero
+    def read_file(self, file_index: FileIndexNode) -> bytes:
+        self.fs.seek(
+            BITMAP_SIZE + FILE_INDEX_SIZE + file_index.file_start_block * BLOCK_SIZE
+        )
+        data = []
+
+        for i in range(file_index.file_blocks):
+            data.append(self.fs.read(BLOCK_SIZE))
+            self.fs.seek(
+                BITMAP_SIZE
+                + FILE_INDEX_SIZE
+                + file_index.file_start_block * BLOCK_SIZE
+                + i * BLOCK_SIZE
+            )
+
+        return b"".join(data)
 
 
 if __name__ == "__main__":
     fs = FileSystem()
 
     file_name = "ahmed_hesham.txt"
-    file_data = b"my name is H"
-
+    file_data = b"my name is H H"
     # fs.write_file(file_name, file_data)
-
-    for i in fs.list_all_files():
-        print(i.file_name, i.file_size, i.file_start_address)
+    for file in fs.list_all_files():
+        print(file.file_name, file.file_blocks, file.file_start_block)
+        print(fs.read_file(file))
