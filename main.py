@@ -1,19 +1,17 @@
 import struct
 import os
-from config import *
-from typing import *
+import math
+from typing import List
+from config import *  
 from utility import reset_seek_to_zero
 
-
-# class FileIndex:
-#     pass
-
-
+# FileIndexNode class
 class FileIndexNode:
     def __init__(self, file_name: str, file_start_block: int, file_blocks: int) -> None:
         self.file_name: str = file_name
         self.file_start_block: int = file_start_block
         self.file_blocks: int = file_blocks
+        self.file_size: int = file_blocks * BLOCK_SIZE  # Calculate file size in bytes
 
     def to_bytes(self) -> bytes:
         file_name_bytes = self.file_name.encode("utf-8").ljust(FILE_NAME_SIZE, b"\0")
@@ -56,7 +54,7 @@ class FileIndexNode:
 
         return cls(file_name, file_start_address, file_size)
 
-
+# FileSystem class
 class FileSystem:
     def __init__(self) -> None:
         if not os.path.exists(FILE_SYSTEM_PATH):
@@ -101,18 +99,36 @@ class FileSystem:
         file_start_block_index = free_blocks[0]
         current_offset = 0
 
+        # Check if the file exists
+        existing_file = self.get_file_by_name(file_name)
+
+        if existing_file:
+            # If the file exists, we will overwrite its blocks
+            # Free up the blocks used by the existing file in the bitmap
+            for block in range(existing_file.file_start_block, existing_file.file_start_block + existing_file.file_blocks):
+                byte_index = block // 8
+                bit_index = block % 8
+                self.bitmap[byte_index] &= ~(1 << bit_index)
+                self.update_bitmap(byte_index)
+        else:
+            # If the file doesn't exist, we'll allocate new blocks
+            current_offset = 0
+
+        # Write the new data to free blocks
         for block in free_blocks:
             self.fs.seek(BITMAP_SIZE + FILE_INDEX_SIZE + block * BLOCK_SIZE)
             block_data = file_data[current_offset : current_offset + BLOCK_SIZE]
             self.fs.write(block_data.ljust(BLOCK_SIZE, b"\0"))
             current_offset += len(block_data)
 
+        # Update bitmap to reflect that these blocks are now used
         for block in free_blocks:
             byte_index = block // 8
             bit_index = block % 8
             self.bitmap[byte_index] |= 1 << bit_index
             self.update_bitmap(byte_index)
 
+        # Update the file index with the new or overwritten file details
         file_index_node = FileIndexNode(
             file_name=file_name,
             file_start_block=file_start_block_index,
@@ -136,16 +152,15 @@ class FileSystem:
             if data.strip(b"\0") != b"":
                 continue
 
+            # Update the file index
             self.fs.seek(BITMAP_SIZE + i * INDEX_ENTRY_SIZE)
             self.fs.write(file_index.to_bytes())
-
             return
 
         raise Exception("no free space")
 
     @reset_seek_to_zero
     def list_all_files(self) -> List[FileIndexNode]:
-
         files = []
 
         for i in range(MAX_INDEX_ENTRIES):
@@ -177,13 +192,35 @@ class FileSystem:
 
         return b"".join(data).rstrip(b"\x00")
 
+    def get_file_by_name(self, file_name: str) -> FileIndexNode:
+        """Check if the file exists by its name"""
+        for i in range(MAX_INDEX_ENTRIES):
+            self.fs.seek(BITMAP_SIZE + i * INDEX_ENTRY_SIZE)
+            data = self.fs.read(INDEX_ENTRY_SIZE)
+            if data.strip(b"\0") == b"":
+                continue
+
+            file_index = FileIndexNode.from_bytes(data)
+            if file_index.file_name == file_name:
+                return file_index
+        return None
 
 if __name__ == "__main__":
     fs = FileSystem()
 
+    # Test: Write and overwrite a file
     file_name = "ahmed_hesham.txt"
     file_data = b"my name is H H"
-    fs.write_file(file_name, file_data)
+    fs.write_file(file_name, file_data)  # Write initial file
+
+    # Overwrite with new data
+    new_file_data = b"my name is H H with extra content"
+    fs.write_file(file_name, new_file_data)  # Overwrite existing file
+
+    # List all files and print storage details
     for file in fs.list_all_files():
-        print(file.file_name, file.file_blocks, file.file_start_block)
-        print(fs.read_file(file))
+        print(f"File Name: {file.file_name}")
+        print(f"File Blocks: {file.file_blocks}")
+        print(f"File Start Block: {file.file_start_block}")
+        print(f"File Size (in bytes): {file.file_size}")
+        print(f"File Content: {fs.read_file(file)}")
