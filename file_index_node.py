@@ -1,8 +1,9 @@
 from typing import BinaryIO, Callable, Dict, List
+from utility import reset_seek_to_zero
 
 
 class FileIndexNode:
-    next_id = 1
+    id_generator = None
 
     def __init__(
         self,
@@ -14,8 +15,7 @@ class FileIndexNode:
         no_id: bool = False,
     ) -> None:
         if not no_id:
-            self.id = FileIndexNode.next_id
-            FileIndexNode.next_id += 1
+            self.id = FileIndexNode.id_generator()
         self.file_name: str = file_name
         self.file_start_block: int = file_start_block
         self.file_blocks: int = file_blocks
@@ -107,7 +107,7 @@ class FileIndexNode:
         children_data_start = (
             config.BITMAP_SIZE
             + config.FILE_INDEX_SIZE
-            + self.file_blocks * config.BLOCK_SIZE
+            + self.file_start_block * config.BLOCK_SIZE
         )
         fs.seek(children_data_start)
         for _ in range(self.children_count):
@@ -130,9 +130,9 @@ class FileIndexNode:
         children_data_start = (
             config.BITMAP_SIZE
             + config.FILE_INDEX_SIZE
-            + self.file_blocks * config.BLOCK_SIZE
+            + self.file_start_block * config.BLOCK_SIZE
         )
         fs.seek(children_data_start)
         for child in self.children:
             fs.write(child.id.to_bytes(4, byteorder="big"))
-            fs.seek(BLOCK_SIZE, 1)
+            # fs.seek(4, 1)

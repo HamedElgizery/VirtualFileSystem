@@ -2,14 +2,21 @@ import math
 import os
 from typing import List, Optional
 from file_index_node import FileIndexNode
-from metadata_utility import Metadata
+from metadata_utility import Metadata, MetadataManager
 from utility import reset_seek_to_zero
 
 
 class FileSystem:
-    def __init__(self, file_system_name: str, specs: Metadata) -> None:
-        self.set_config(specs)
+    def __init__(self, file_system_name: str, specs: Optional[Metadata] = None) -> None:
         self.FILE_SYSTEM_PATH = file_system_name
+
+        if specs:
+            self.metedataManager = MetadataManager(file_system_name, specs)
+            self.set_config(specs)
+        else:
+            self.metedataManager = MetadataManager(file_system_name)
+            self.set_config(self.metedataManager.metadata)
+
         if not os.path.exists(self.FILE_SYSTEM_PATH):
             self.fs = open(self.FILE_SYSTEM_PATH, "w+b")
         else:
@@ -22,6 +29,8 @@ class FileSystem:
         self.current_page_index = 0
         self.bitmap = self.load_bitmap()
         self.index, self.index_locations = self.load_index()
+
+        FileIndexNode.id_generator = lambda: self.metedataManager.increment_id()
 
         root = self.get_file_by_name("root")
         if not root:
@@ -55,6 +64,7 @@ class FileSystem:
         )
         self.MAX_INDEX_ENTRIES = self.FILE_INDEX_SIZE // self.INDEX_ENTRY_SIZE
         self.BITMAP_SIZE = self.NUM_BLOCKS // 8
+        FileIndexNode.next_id = Metadata.current_id
 
     @reset_seek_to_zero
     def reserve_file(self) -> None:
@@ -91,11 +101,12 @@ class FileSystem:
         if any(child.file_name == dir_name for child in parent_node.children):
             raise Exception("Directory already exists.")
 
-        free_blocks = self.find_free_space_bitmap(1)
+        free_block = self.find_free_space_bitmap(1)[0]
+        self.update_bitmap(free_block)
 
         new_dir_node = FileIndexNode(
             file_name=dir_name,
-            file_start_block=free_blocks[0],
+            file_start_block=free_block,
             file_blocks=1,
             is_directory=True,
             children_count=0,

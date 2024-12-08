@@ -1,4 +1,7 @@
-from metadata_utility import Metadata, write_metadata_file, read_metadata_file
+from metadata_utility import (
+    Metadata,
+    MetadataManager,
+)
 from file_system import FileSystem
 
 
@@ -24,26 +27,21 @@ def file_creation_test(fs: FileSystem):
 
 def directory_creation_test(fs: FileSystem):
 
-    fs.create_directory("ahmed", fs.get_file_by_name("root"))
+    fs.create_directory("ahmed3555", fs.get_file_by_name("root"))
     print(fs.list_directory_contents("root"))
 
     # for file in fs.list_all_files():
     #     print(f"File Name: {file.file_name}")
 
 
-def create_file_system(name: str, specs: Metadata):
-    write_metadata_file(name, specs)
-    return FileSystem(name, specs)
-
-
-def load_file_system(name: str):
-    specs = read_metadata_file(name)
-    return FileSystem(name, specs)
-
-
 if __name__ == "__main__":
-    fs = load_file_system("file.disk")
-    directory_creation_test(fs)
 
-    # config = Metadata("file.disk", 4096, 32, 1024 * 1024 * 1, 32)
-    # fs = create_file_system("file.disk", config)
+    name = "file.disk"
+    config = Metadata(name, 4096, 32, 1024 * 1024 * 1, 32)
+
+    # Creating file System
+    # fs = FileSystem(name, config)
+
+    # directory creation test
+    fs = FileSystem(name)
+    directory_creation_test(fs)
