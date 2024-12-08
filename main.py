@@ -4,6 +4,9 @@ from metadata_utility import (
 from file_system import FileSystem
 
 
+# TODO: make sure to have path resolultion to be able to write files or other directories to nested directories
+
+
 def file_creation_test(fs: FileSystem):
     # Test: Write and overwrite a file
 
