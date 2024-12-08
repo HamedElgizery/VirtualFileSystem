@@ -87,7 +87,7 @@ class FileSystem:
         # parent_node = self.get_file_by_name(parent_dir_name)
         if not parent_node or not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
-
+        parent_node.load_children(self.fs, self, self.index)
         if any(child.file_name == dir_name for child in parent_node.children):
             raise Exception("Directory already exists.")
 
