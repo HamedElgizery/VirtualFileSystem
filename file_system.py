@@ -5,6 +5,8 @@ from file_index_node import FileIndexNode
 from metadata_utility import Metadata, MetadataManager
 from utility import reset_seek_to_zero
 
+# TODO: ensure no 2 file systems are open for the same file
+
 
 class FileSystem:
     def __init__(self, file_system_name: str, specs: Optional[Metadata] = None) -> None:
@@ -25,8 +27,6 @@ class FileSystem:
         if os.path.getsize(self.FILE_SYSTEM_PATH) == 0:
             self.reserve_file()
 
-        self.current_page = None
-        self.current_page_index = 0
         self.bitmap = self.load_bitmap()
         self.index, self.index_locations = self.load_index()
 
@@ -37,11 +37,14 @@ class FileSystem:
             root = FileIndexNode("root", 0, 1, is_directory=True)
             root.id = 0  # id of the root directory is 0
             root.calculate_file_size(self.BLOCK_SIZE)
+
+            self.bitmap[0] |= 1 << 0
+            self.update_bitmap(0)
+
             self.write_to_index(root)
 
     def __del__(self):
-        if not self.fs.closed:
-            self.fs.close()
+        self.fs.close()
 
     def set_config(self, specs: Metadata):
         self.FILE_SYSTEM_PATH = specs.file_system_path
@@ -74,10 +77,6 @@ class FileSystem:
         self.fs.write(b"\0")
 
     @reset_seek_to_zero
-    def load_bitmap(self) -> bytearray:
-        return bytearray(self.fs.read(self.BITMAP_SIZE))
-
-    @reset_seek_to_zero
     def load_index(self):
         hash_table = {}
         file_location_map = {}
@@ -93,8 +92,8 @@ class FileSystem:
 
         return hash_table, file_location_map
 
-    def create_directory(self, dir_name: str, parent_node: FileIndexNode = None):
-        # parent_node = self.get_file_by_name(parent_dir_name)
+    def create_directory(self, dir_name: str, parent_dir_name: str = None):
+        parent_node = self.get_file_by_name(parent_dir_name)
         if not parent_node or not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
         parent_node.load_children(self.fs, self, self.index)
@@ -102,7 +101,11 @@ class FileSystem:
             raise Exception("Directory already exists.")
 
         free_block = self.find_free_space_bitmap(1)[0]
-        self.update_bitmap(free_block)
+        byte_index = free_block // 8
+        bit_index = free_block % 8
+
+        self.bitmap[0] |= 1 << bit_index
+        self.update_bitmap(byte_index)
 
         new_dir_node = FileIndexNode(
             file_name=dir_name,
@@ -121,11 +124,17 @@ class FileSystem:
         self.write_to_index(new_dir_node)
         self.write_to_index(parent_node)
 
-    def create_file(self, file_name: str, file_data: bytes):
+    def create_file(self, file_name: str, file_data: bytes, parent_dir: str):
+
+        parent_node = self.get_file_by_name(parent_dir)
+        if not parent_node.is_directory:
+            raise Exception("Parent directory does not exist or is not a directory.")
+
         num_blocks_needed = (len(file_data) + self.BLOCK_SIZE - 1) // self.BLOCK_SIZE
         free_blocks = self.find_free_space_bitmap(num_blocks_needed)
         file_start_block_index = free_blocks[0]
 
+        # TODO: later on we will make use of path so for parent_dir it will take a path and we will check files or folders in it to see if name exists or not
         # Check if the file exists
         existing_file = self.get_file_by_name(file_name)
 
@@ -163,8 +172,21 @@ class FileSystem:
             file_start_block=file_start_block_index,
             file_blocks=num_blocks_needed,
         )
+        parent_node.load_children(self.fs, self, self.index)
         file_index_node.calculate_file_size(self.BLOCK_SIZE)
+        parent_node.children.append(file_index_node)
+        parent_node.children_count += 1
+
+        parent_node.save_children(
+            self.fs, self.BLOCK_SIZE, self, lambda x: self.find_free_space_bitmap(x)
+        )
+
         self.write_to_index(file_index_node)
+        self.write_to_index(parent_node)
+
+    @reset_seek_to_zero
+    def load_bitmap(self) -> bytearray:
+        return bytearray(self.fs.read(self.BITMAP_SIZE))
 
     @reset_seek_to_zero
     def update_bitmap(self, byte_index) -> None:
@@ -238,19 +260,6 @@ class FileSystem:
     @reset_seek_to_zero
     def list_all_files(self) -> List[FileIndexNode]:
         return list(self.index.values())
-
-        # files = []
-
-        # for i in range(self.MAX_INDEX_ENTRIES):
-        #     self.fs.seek(self.BITMAP_SIZE + i * self.INDEX_ENTRY_SIZE)
-        #     data = self.fs.read(self.INDEX_ENTRY_SIZE)
-        #     if data.strip(b"\0") == b"":
-        #         break
-
-        #     file_index = FileIndexNode.from_bytes(data, self)
-        #     files.append(file_index)
-
-        # return files
 
     def list_directory_contents(self, dir_name: str) -> List[str]:
         dir_node = self.get_file_by_name(dir_name)

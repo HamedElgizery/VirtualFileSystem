@@ -24,6 +24,19 @@ class FileIndexNode:
         self.children_count = children_count
         self.children = [] if is_directory else None
 
+    def __repr__(self) -> str:
+        return (
+            f"id={self.id}\n"
+            f"file_name={self.file_name!r}\n"
+            f"file_start_block={self.file_start_block}\n"
+            f"file_blocks={self.file_blocks}\n"
+            f"file_size={self.file_size}\n"
+            f"is_directory={self.is_directory}\n"
+            f"children_count={self.children_count}\n"
+            f"children={self.children!r}\n"
+            f"==========================\n"
+        )
+
     def calculate_file_size(self, block_size: int):
         self.file_size = self.file_blocks * block_size
 
@@ -135,4 +148,3 @@ class FileIndexNode:
         fs.seek(children_data_start)
         for child in self.children:
             fs.write(child.id.to_bytes(4, byteorder="big"))
-            # fs.seek(4, 1)
