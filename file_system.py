@@ -367,7 +367,7 @@ class FileSystem:
 
         if file_index.id in self.index:
             self.index[file_index.id] = file_index
-
+            self.index_locations[file_index.id] = file_index.file_start_block
             self.fs.seek(
                 self.BITMAP_SIZE
                 + self.index_locations[file_index.id] * self.INDEX_ENTRY_SIZE
@@ -463,6 +463,21 @@ class FileSystem:
 
         self.write_to_index(file_node)
 
+    def copy_file(self, old_dir: str, new_dir: str) -> None:
+        file_node = self.resolve_path(old_dir)
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        self.create_file(new_dir, self.read_file(old_dir))
+
+    def move_file(self, old_dir: str, new_dir: str) -> None:
+        file_node = self.resolve_path(old_dir)
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        self.copy_file(old_dir, new_dir)
+        self.delete_file(old_dir)
+
     def calculate_fragmentation(self):
         # Sort the file nodes by start block
         file_nodes = sorted(self.index.values(), key=lambda node: node.file_start_block)
@@ -494,3 +509,10 @@ class FileSystem:
         # Calculate fragmentation percentage only up to the last used block
         fragmentation_percentage = (total_free_in_gaps / (last_end_block + 1)) * 100
         return fragmentation_percentage
+
+    def defragmentation(self):
+
+        file_nodes = sorted(self.index.values(), key=lambda node: node.file_start_block)
+
+        for node in file_nodes:
+            pass

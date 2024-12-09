@@ -41,7 +41,7 @@ def do_fs_tests():
     if os.path.exists(f"{fs_name}.dt"):
         os.remove(f"{fs_name}.dt")
 
-    config = Metadata(fs_name, 4096, 32, 1024 * 1024 * 1, 32)
+    config = Metadata(fs_name, 1024 * 1024, 32, 1024 * 1024 * 80, 32)
     fs = FileSystem(fs_name, config)
 
     for i in range(9):
@@ -50,6 +50,7 @@ def do_fs_tests():
         fs.create_file(f"/root/{file_name}", file_data)
 
     fs.delete_file("/root/file_0.txt")
+    fs.defragmentation()
     print(fs.calculate_fragmentation())
 
     fs.create_directory("/root/a")
