@@ -48,6 +48,7 @@ class FileSystem:
     def __del__(self):
         self.fs.close()
 
+    # TODO: add a method which will also automically copy all the older blocks and expand
     @reset_seek_to_zero
     def free_block(self, block_number: int) -> None:
 

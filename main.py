@@ -6,6 +6,11 @@ from file_system import FileSystem
 
 
 # TODO: VERY IMPORTANT do boundary checks in this case we might as well make an interator for each block (index, bitmap, file_itself)
+# TODO: urgently add defragemenation support
+# TODO: create more tests
+# TODO: use win32 tools to gurrentee support for windows
+# TODO: optional add jornaling support and crash recovery
+# TODO: optional consider a way to not load entire index into memory and split parts of it (very optional not important at all even)
 
 
 def file_creation_test(fs: FileSystem):
