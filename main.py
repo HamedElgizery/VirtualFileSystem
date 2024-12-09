@@ -44,16 +44,16 @@ def do_fs_tests():
     config = Metadata(fs_name, 4096, 32, 1024 * 1024 * 1, 32)
     fs = FileSystem(fs_name, config)
 
-    for i in range(1):
+    for i in range(9):
         file_name = f"file_{i}.txt"
         file_data = b"my name is H H"
-        fs.create_file(file_name, file_data, "/root")
+        fs.create_file(f"/root/{file_name}", file_data)
 
     fs.delete_file("/root/file_0.txt")
 
-    fs.create_directory("a", "/root")
-    fs.create_directory("b", "/root/a")
-    fs.create_directory("c", "/root")
+    fs.create_directory("/root/a")
+    fs.create_directory("/root/a/b")
+    fs.create_directory("/root/c")
 
     dirs = fs.list_directory_contents("/root")
     dirs.sort()
@@ -67,7 +67,7 @@ def do_fs_tests():
 
     file_name = "d"
     file_data = b"my name is H H"
-    fs.create_file(file_name, file_data, "/root")
+    fs.create_file(f"/root/{file_name}", file_data)
     dirs = fs.list_directory_contents("/root")
     dirs.sort()
     if dirs[0] != "a" or dirs[1] != "c" or dirs[2] != "d":

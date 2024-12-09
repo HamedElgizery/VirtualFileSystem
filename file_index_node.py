@@ -1,6 +1,9 @@
 from typing import BinaryIO, Callable, Dict, List
 from utility import reset_seek_to_zero
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from file_system import FileSystem
 
 # TODO: need to update code here a bit so it doesnt take the entire filesystem directly if it wants to do an operation or if it will just dont name it config and pass only methods it might need
 
@@ -71,32 +74,34 @@ class FileIndexNode:
         )
 
     @classmethod
-    def from_bytes(cls, data: bytes, config) -> "FileIndexNode":
+    def from_bytes(cls, data: bytes, file_system: "FileSystem") -> "FileIndexNode":
         offset_pointer = 0
 
         id_bytes = data[offset_pointer : offset_pointer + 4]
         offset_pointer += 4
 
-        file_name_bytes = data[offset_pointer : offset_pointer + config.FILE_NAME_SIZE]
-        offset_pointer += config.FILE_NAME_SIZE
+        file_name_bytes = data[
+            offset_pointer : offset_pointer + file_system.FILE_NAME_SIZE
+        ]
+        offset_pointer += file_system.FILE_NAME_SIZE
 
         file_blocks_bytes = data[
-            offset_pointer : offset_pointer + config.MAX_FILE_BLOCKS
+            offset_pointer : offset_pointer + file_system.MAX_FILE_BLOCKS
         ]
-        offset_pointer += config.MAX_FILE_BLOCKS
+        offset_pointer += file_system.MAX_FILE_BLOCKS
 
         file_start_block_bytes = data[
-            offset_pointer : offset_pointer + config.FILE_START_BLOCK_INDEX_SIZE
+            offset_pointer : offset_pointer + file_system.FILE_START_BLOCK_INDEX_SIZE
         ]
-        offset_pointer += config.FILE_START_BLOCK_INDEX_SIZE
+        offset_pointer += file_system.FILE_START_BLOCK_INDEX_SIZE
 
         is_directory_byte = data[offset_pointer : offset_pointer + 1]
         offset_pointer += 1
 
         children_count_bytes = data[
-            offset_pointer : offset_pointer + config.MAX_LENGTH_CHILDRENS
+            offset_pointer : offset_pointer + file_system.MAX_LENGTH_CHILDRENS
         ]
-        offset_pointer += config.MAX_LENGTH_CHILDRENS
+        offset_pointer += file_system.MAX_LENGTH_CHILDRENS
 
         id = int.from_bytes(id_bytes, byteorder="big")
         file_name = file_name_bytes.rstrip(b"\x00").decode("utf-8")
@@ -109,116 +114,73 @@ class FileIndexNode:
             file_name, file_start_block, file_blocks, is_directory, children_count, True
         )
         instance.id = id
-        instance.calculate_file_size(config.BLOCK_SIZE)
+        instance.calculate_file_size(file_system.BLOCK_SIZE)
         return instance
 
-    def load_children(
-        self, fs: BinaryIO, config, index: Dict[int, "FileIndexNode"]
-    ) -> List[int]:
+    def load_children(self, file_system: "FileSystem") -> List["FileIndexNode"]:
 
         if not self.is_directory:
             return
         children = []
         children_data_start = (
-            config.BITMAP_SIZE
-            + config.FILE_INDEX_SIZE
-            + self.file_start_block * config.BLOCK_SIZE
+            file_system.BITMAP_SIZE
+            + file_system.FILE_INDEX_SIZE
+            + self.file_start_block * file_system.BLOCK_SIZE
         )
-        fs.seek(children_data_start)
+        file_system.fs.seek(children_data_start)
         for _ in range(self.children_count):
-            child_indentifier = fs.read(4)
-            child_node = index[int.from_bytes(child_indentifier, byteorder="big")]
+            child_indentifier = file_system.fs.read(4)
+            child_node = file_system.index[
+                int.from_bytes(child_indentifier, byteorder="big")
+            ]
             children.append(child_node)
 
         return children
 
-    def add_child(self, fs: BinaryIO, child_to_write: "FileIndexNode", config) -> None:
+    def add_child(
+        self, file_system: "FileSystem", child_to_write: "FileIndexNode"
+    ) -> None:
         if not self.is_directory:
             return
 
         children_data_start = (
-            config.BITMAP_SIZE
-            + config.FILE_INDEX_SIZE
-            + self.file_start_block * config.BLOCK_SIZE
+            file_system.BITMAP_SIZE
+            + file_system.FILE_INDEX_SIZE
+            + self.file_start_block * file_system.BLOCK_SIZE
             + 4 * self.children_count
         )
 
-        if 4 * (self.children_count + 1) >= self.file_blocks * config.BLOCK_SIZE:
-            children = self.load_children(fs, config, config.index)
-            config.free_block(self.file_start_block)
-
-            free_blocks = config.find_free_space_bitmap(self.file_blocks * 2)
-            start_block = free_blocks[0]
-
-            self.file_start_block = start_block
-            self.file_blocks = len(free_blocks)
-
-            children_data_start = (
-                config.BITMAP_SIZE
-                + config.FILE_INDEX_SIZE
-                + start_block * config.BLOCK_SIZE
-            )
-
-            for i, child in enumerate(children):
-                fs.seek(children_data_start + i * 4)
-                fs.write(child.id.to_bytes(4, byteorder="big"))
-
-            for block in free_blocks:
-                byte_index = block // 8
-                bit_index = block % 8
-                config.bitmap[byte_index] |= 1 << bit_index
-                config.update_bitmap(byte_index)
+        if 4 * (self.children_count + 1) >= self.file_blocks * file_system.BLOCK_SIZE:
+            file_system.realign(self)
 
         children_data_start = (
-            config.BITMAP_SIZE
-            + config.FILE_INDEX_SIZE
-            + self.file_start_block * config.BLOCK_SIZE
+            file_system.BITMAP_SIZE
+            + file_system.FILE_INDEX_SIZE
+            + self.file_start_block * file_system.BLOCK_SIZE
             + 4 * self.children_count
         )
 
-        fs.seek(children_data_start)
-        fs.write(child_to_write.id.to_bytes(4, byteorder="big"))
+        file_system.fs.seek(children_data_start)
+        file_system.fs.write(child_to_write.id.to_bytes(4, byteorder="big"))
         self.children_count += 1
 
-    def remove_child(self, fs: BinaryIO, child_dir: str, config) -> None:
-        children = self.load_children(fs, config, config.index)
+    def remove_child(self, file_system: "FileSystem", child_dir: str) -> None:
 
+        children = self.load_children(file_system)
+        shifting = False
         for i, child in enumerate(children):
-            if config.index[child.id].file_name != child_dir:
+            if file_system.index[child.id].file_name == child_dir:
+                shifting = True
                 continue
-            
+
             child_data_start = (
-                config.BITMAP_SIZE
-                + config.FILE_INDEX_SIZE
-                + self.file_start_block * config.BLOCK_SIZE
-                + 4 * i
+                file_system.BITMAP_SIZE
+                + file_system.FILE_INDEX_SIZE
+                + self.file_start_block * file_system.BLOCK_SIZE
+                + 4 * (i - (1 if shifting else 0))
             )
 
-            fs.seek(child_data_start)
-            fs.write(b'\0' * 4)
-            self.children_count -= 1
-            break
+            file_system.fs.seek(child_data_start)
+            file_system.fs.write(child.id.to_bytes(4, byteorder="big"))
 
-
-
-
-    # def save_children(
-    #     self,
-    #     fs: BinaryIO,
-    #     BLOCK_SIZE: int,
-    #     config,
-    #     free_blocks_func: Callable[[int], List[int]],
-    # ) -> None:
-    #     if not self.is_directory:
-    #         return
-
-    #     free_blocks_required = (len(self.children) * 4) // BLOCK_SIZE
-    #     # free_blocks = free_blocks_func(free_blocks_required)
-    #     children_data_start = (
-    #         config.BITMAP_SIZE
-    #         + config.FILE_INDEX_SIZE
-    #         + self.file_start_block * config.BLOCK_SIZE
-    #     )
-    #     fs.seek(children_data_start)
-    #     for child in self.children:
-    #         fs.write(child.id.to_bytes(4, byteorder="big"))
+        self.children_count -= 1

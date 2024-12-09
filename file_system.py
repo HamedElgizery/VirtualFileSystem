@@ -48,29 +48,6 @@ class FileSystem:
     def __del__(self):
         self.fs.close()
 
-    # TODO: add a method which will also automically copy all the older blocks and expand
-    @reset_seek_to_zero
-    def free_block(self, block_number: int) -> None:
-        self.bitmap[block_number // 8] &= ~(1 << (block_number % 8))
-        self.update_bitmap(block_number // 8)
-        self.fs.seek(block_number * self.BLOCK_SIZE)
-        self.fs.write(b"\0" * self.BLOCK_SIZE)
-
-    def delete_file(self, file_dir: str) -> None:
-        parent_node, file_node = self.resolve_path(file_dir, True)
-        
-        if not file_node:
-            raise ValueError("File doesn't exist")
-        if file_node.is_directory:
-            raise ValueError("Not a file")
-        
-        for block in range(file_node.file_blocks):
-            self.free_block(file_node.file_start_block + block)
-        
-        parent_node.remove_child(self.fs, file_node.file_name, self)
-        self.delete_from_index(file_node)
-
-
     def set_config(self, specs: Metadata):
         self.FILE_SYSTEM_PATH = specs.file_system_path
         self.FILE_INDEX_SIZE = specs.file_index_size
@@ -95,13 +72,6 @@ class FileSystem:
         FileIndexNode.next_id = Metadata.current_id
 
     @reset_seek_to_zero
-    def reserve_file(self) -> None:
-        self.fs.seek(
-            self.BITMAP_SIZE + self.FILE_INDEX_SIZE + self.FILE_SYSTEM_SIZE - 1
-        )
-        self.fs.write(b"\0")
-
-    @reset_seek_to_zero
     def load_index(self):
         hash_table = {}
         file_location_map = {}
@@ -117,13 +87,95 @@ class FileSystem:
 
         return hash_table, file_location_map
 
-    def create_directory(self, dir_name: str, parent_dir_name: str = None):
+    @reset_seek_to_zero
+    def load_bitmap(self) -> bytearray:
+        return bytearray(self.fs.read(self.BITMAP_SIZE))
+
+    # TODO: add a method which will also automically copy all the older blocks and expand
+    @reset_seek_to_zero
+    def free_block(self, block_number: int) -> None:
+        self.bitmap[block_number // 8] &= ~(1 << (block_number % 8))
+        self.update_bitmap(block_number // 8)
+        self.fs.seek(block_number * self.BLOCK_SIZE)
+        self.fs.write(b"\0" * self.BLOCK_SIZE)
+
+    def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
+        if file_index.is_directory:
+            children = file_index.load_children(self)
+            self.free_block(file_index.file_start_block)
+
+            free_blocks = self.find_free_space_bitmap(file_index.file_blocks * factor)
+            start_block = free_blocks[0]
+
+            file_index.file_start_block = start_block
+            file_index.file_blocks = len(free_blocks)
+
+            children_data_start = (
+                self.BITMAP_SIZE + self.FILE_INDEX_SIZE + start_block * self.BLOCK_SIZE
+            )
+
+            for i, child in enumerate(children):
+                self.fs.seek(children_data_start + i * 4)
+                self.fs.write(child.id.to_bytes(4, byteorder="big"))
+
+            for block in free_blocks:
+                byte_index = block // 8
+                bit_index = block % 8
+                self.bitmap[byte_index] |= 1 << bit_index
+                self.update_bitmap(byte_index)
+
+        else:
+            file_data = self.read_file(file_index)
+            self.free_block(file_index.file_start_block)
+
+            free_blocks = self.find_free_space_bitmap(file_index.file_blocks * factor)
+            start_block = free_blocks[0]
+
+            file_index.file_start_block = start_block
+            file_index.file_blocks = len(free_blocks)
+
+            file_data_start = (
+                self.BITMAP_SIZE + self.FILE_INDEX_SIZE + start_block * self.BLOCK_SIZE
+            )
+
+            self.fs.seek(file_data_start)
+            self.fs.write(file_data.ljust(self.BLOCK_SIZE, b"\0"))
+
+            for block in free_blocks:
+                byte_index = block // 8
+                bit_index = block % 8
+                self.bitmap[byte_index] |= 1 << bit_index
+                self.update_bitmap(byte_index)
+
+    def delete_file(self, file_dir: str) -> None:
+        parent_node, file_node = self.resolve_path(file_dir, True)
+
+        if not file_node:
+            raise ValueError("File doesn't exist")
+        if file_node.is_directory:
+            raise ValueError("Not a file")
+
+        for block in range(file_node.file_blocks):
+            self.free_block(file_node.file_start_block + block)
+
+        parent_node.remove_child(self, file_node.file_name)
+        self.delete_from_index(file_node)
+
+    @reset_seek_to_zero
+    def reserve_file(self) -> None:
+        self.fs.seek(
+            self.BITMAP_SIZE + self.FILE_INDEX_SIZE + self.FILE_SYSTEM_SIZE - 1
+        )
+        self.fs.write(b"\0")
+
+    def create_directory(self, dir_name: str):
         # parent_node = self.get_file_by_name(parent_dir_name)
-        parent_node = self.resolve_path(parent_dir_name)
+        directories = [d for d in dir_name.split("/") if d not in ("", ".")]
+        parent_node = self.resolve_path(directories[-2])
         if not parent_node or not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
-        children = parent_node.load_children(self.fs, self, self.index)
-        if any(child.file_name == dir_name for child in children):
+        children = parent_node.load_children(self)
+        if any(child.file_name == directories[-1] for child in children):
             raise Exception("Directory already exists.")
 
         free_block = self.find_free_space_bitmap(1)[0]
@@ -134,20 +186,20 @@ class FileSystem:
         self.update_bitmap(byte_index)
 
         new_dir_node = FileIndexNode(
-            file_name=dir_name,
+            file_name=directories[-1],
             file_start_block=free_block,
             file_blocks=1,
             is_directory=True,
             children_count=0,
         )
-        parent_node.add_child(self.fs, new_dir_node, self)
+        parent_node.add_child(self, new_dir_node)
 
         self.write_to_index(new_dir_node)
         self.write_to_index(parent_node)
 
-    def create_file(self, file_name: str, file_data: bytes, parent_dir: str):
-
-        parent_node = self.resolve_path(parent_dir)
+    def create_file(self, file_dir: str, file_data: bytes):
+        directories = [d for d in file_dir.split("/") if d not in ("", ".")]
+        parent_node = self.resolve_path(directories[-2])
         # parent_node = self.get_file_by_name(parent_dir)
         if not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
@@ -158,7 +210,7 @@ class FileSystem:
 
         # TODO: later on we will make use of path so for parent_dir it will take a path and we will check files or folders in it to see if name exists or not
         # Check if the file exists
-        existing_file = self.get_file_by_name(file_name)
+        existing_file = self.get_file_by_name(directories[-1])
 
         if existing_file:
             # Free up the blocks used by the existing file in the bitmap
@@ -190,47 +242,56 @@ class FileSystem:
 
         # Update the file index
         file_index_node = FileIndexNode(
-            file_name=file_name,
+            file_name=directories[-1],
             file_start_block=file_start_block_index,
             file_blocks=num_blocks_needed,
         )
         file_index_node.calculate_file_size(self.BLOCK_SIZE)
 
-        parent_node.add_child(self.fs, file_index_node, self)
+        parent_node.add_child(self, file_index_node)
 
         self.write_to_index(file_index_node)
         self.write_to_index(parent_node)
-
-    @reset_seek_to_zero
-    def load_bitmap(self) -> bytearray:
-        return bytearray(self.fs.read(self.BITMAP_SIZE))
 
     @reset_seek_to_zero
     def update_bitmap(self, byte_index) -> None:
         self.fs.seek(byte_index)
         self.fs.write(bytes([self.bitmap[byte_index]]))
 
-    def find_free_space_bitmap(self, required_blocks: int):
+    def find_free_space_bitmap(self, required_blocks):
         free_blocks = []
+        start_index = -1
+        count = 0
 
         for i in range(self.NUM_BLOCKS):
             byte_index = i // 8
             bit_index = i % 8
 
             if not self.bitmap[byte_index] & (1 << bit_index):
-                free_blocks.append(i)
-                if len(free_blocks) == required_blocks:
+                if count == 0:
+                    start_index = i
+                count += 1
+
+                if count == required_blocks:
+                    free_blocks = list(
+                        range(start_index, start_index + required_blocks)
+                    )
                     break
+            else:
+                start_index = -1
+                count = 0
 
         if len(free_blocks) < required_blocks:
-            raise Exception("No free space available.")
+            raise Exception("No continuous free space available.")
 
         return free_blocks
 
-    def resolve_path(self, path: str, return_parent : bool = False) -> Optional[FileIndexNode]:
+    def resolve_path(
+        self, path: str, return_parent: bool = False
+    ) -> Optional[FileIndexNode]:
         directories = [d for d in path.split("/") if d not in ("", ".")]
-        current_id = 0 if path.startswith("/") else self.current_directory_id
-        parent_id = 0 if path.startswith("/") else self.current_directory_id
+        current_id = 0 if path.startswith("/") else self.index[0].id
+        parent_id = 0 if path.startswith("/") else self.index[0].id
 
         for i, directory in enumerate(directories):
 
@@ -249,9 +310,7 @@ class FileSystem:
                 current_id = parent_dir.id
                 continue
 
-            for child in self.index[current_id].load_children(
-                self.fs, self, self.index
-            ):
+            for child in self.index[current_id].load_children(self):
                 if child.file_name == directory:
                     parent_id = current_id
                     current_id = child.id
@@ -271,15 +330,12 @@ class FileSystem:
             return
 
         del self.index[file_index.id]
-        
+
         self.fs.seek(
             self.BITMAP_SIZE
             + self.index_locations[file_index.id] * self.INDEX_ENTRY_SIZE
         )
-        self.fs.write(
-            b"\0" * self.INDEX_ENTRY_SIZE         
-        )
-
+        self.fs.write(b"\0" * self.INDEX_ENTRY_SIZE)
 
     @reset_seek_to_zero
     def write_to_index(self, file_index: FileIndexNode) -> None:
@@ -338,7 +394,7 @@ class FileSystem:
         if not dir_node or not dir_node.is_directory:
             raise Exception("Directory does not exist or is not a directory.")
 
-        children = dir_node.load_children(self.fs, self, self.index)
+        children = dir_node.load_children(self)
         return [child.file_name for child in children]
 
     @reset_seek_to_zero
