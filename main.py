@@ -73,6 +73,8 @@ def do_fs_tests():
     if dirs[0] != "a" or dirs[1] != "c" or dirs[2] != "d":
         print("Error in directory creation test")
 
+    print(fs.get_fragmented_percentage())
+
 
 if __name__ == "__main__":
 

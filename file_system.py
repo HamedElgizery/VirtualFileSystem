@@ -182,7 +182,7 @@ class FileSystem:
         byte_index = free_block // 8
         bit_index = free_block % 8
 
-        self.bitmap[0] |= 1 << bit_index
+        self.bitmap[byte_index] |= 1 << bit_index
         self.update_bitmap(byte_index)
 
         new_dir_node = FileIndexNode(
@@ -423,3 +423,16 @@ class FileSystem:
                 return file_index
 
         return None
+
+    def get_fragmented_percentage(self) -> float:
+        non_continuous_blocks = 0
+        total_blocks = 0
+        for file in self.index.values():
+            total_blocks += file.file_blocks
+            current_block = file.file_start_block
+            for block in range(1, file.file_blocks):
+                if current_block + 1 != file.file_start_block + block:
+                    non_continuous_blocks += 1
+                current_block += 1
+
+        return (non_continuous_blocks / total_blocks) * 100 if total_blocks > 0 else 0
