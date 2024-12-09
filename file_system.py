@@ -253,6 +253,35 @@ class FileSystem:
         self.write_to_index(file_index_node)
         self.write_to_index(parent_node)
 
+# adddED edit file 
+
+def edit_file(self, file_dir: str, new_data: bytes):
+    
+   
+    parent_node, file_node = self.resolve_path(file_dir, return_parent=True)
+    
+    if not file_node:
+        raise FileNotFoundError("File does not exist.")
+    if file_node.is_directory:
+        raise ValueError("The specified path is a directory.")
+    
+    
+    max_data_size = file_node.file_blocks * self.BLOCK_SIZE
+    if len(new_data) > max_data_size:
+        raise ValueError("New data exceeds the allocated file size. Please resize the file.")
+    
+
+    start_position = (
+        self.BITMAP_SIZE
+        + self.FILE_INDEX_SIZE
+        + file_node.file_start_block * self.BLOCK_SIZE
+    )
+    self.fs.seek(start_position)
+    self.fs.write(new_data.ljust(max_data_size, b"\0"))  
+
+
+        
+
     @reset_seek_to_zero
     def update_bitmap(self, byte_index) -> None:
         self.fs.seek(byte_index)
