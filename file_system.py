@@ -51,11 +51,25 @@ class FileSystem:
     # TODO: add a method which will also automically copy all the older blocks and expand
     @reset_seek_to_zero
     def free_block(self, block_number: int) -> None:
-
         self.bitmap[block_number // 8] &= ~(1 << (block_number % 8))
         self.update_bitmap(block_number // 8)
         self.fs.seek(block_number * self.BLOCK_SIZE)
         self.fs.write(b"\0" * self.BLOCK_SIZE)
+
+    def delete_file(self, file_dir: str) -> None:
+        parent_node, file_node = self.resolve_path(file_dir, True)
+        
+        if not file_node:
+            raise ValueError("File doesn't exist")
+        if file_node.is_directory:
+            raise ValueError("Not a file")
+        
+        for block in range(file_node.file_blocks):
+            self.free_block(file_node.file_start_block + block)
+        
+        parent_node.remove_child(self.fs, file_node.file_name, self)
+        self.delete_from_index(file_node)
+
 
     def set_config(self, specs: Metadata):
         self.FILE_SYSTEM_PATH = specs.file_system_path
@@ -213,9 +227,10 @@ class FileSystem:
 
         return free_blocks
 
-    def resolve_path(self, path: str) -> Optional[FileIndexNode]:
+    def resolve_path(self, path: str, return_parent : bool = False) -> Optional[FileIndexNode]:
         directories = [d for d in path.split("/") if d not in ("", ".")]
         current_id = 0 if path.startswith("/") else self.current_directory_id
+        parent_id = 0 if path.startswith("/") else self.current_directory_id
 
         for i, directory in enumerate(directories):
 
@@ -229,6 +244,7 @@ class FileSystem:
                 continue
 
             if directory == "..":
+                parent_id = current_id
                 parent_dir = self.index[current_id]
                 current_id = parent_dir.id
                 continue
@@ -237,12 +253,33 @@ class FileSystem:
                 self.fs, self, self.index
             ):
                 if child.file_name == directory:
+                    parent_id = current_id
                     current_id = child.id
                     break
             else:
                 raise FileNotFoundError(f"File {directory} not found.")
 
+        if return_parent:
+            return self.index[parent_id], self.index[current_id]
+
         return self.index[current_id]
+
+    @reset_seek_to_zero
+    def delete_from_index(self, file_index: FileIndexNode) -> None:
+
+        if file_index.id not in self.index:
+            return
+
+        del self.index[file_index.id]
+        
+        self.fs.seek(
+            self.BITMAP_SIZE
+            + self.index_locations[file_index.id] * self.INDEX_ENTRY_SIZE
+        )
+        self.fs.write(
+            b"\0" * self.INDEX_ENTRY_SIZE         
+        )
+
 
     @reset_seek_to_zero
     def write_to_index(self, file_index: FileIndexNode) -> None:

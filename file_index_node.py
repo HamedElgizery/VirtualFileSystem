@@ -180,6 +180,28 @@ class FileIndexNode:
         fs.write(child_to_write.id.to_bytes(4, byteorder="big"))
         self.children_count += 1
 
+    def remove_child(self, fs: BinaryIO, child_dir: str, config) -> None:
+        children = self.load_children(fs, config, config.index)
+
+        for i, child in enumerate(children):
+            if config.index[child.id].file_name != child_dir:
+                continue
+            
+            child_data_start = (
+                config.BITMAP_SIZE
+                + config.FILE_INDEX_SIZE
+                + self.file_start_block * config.BLOCK_SIZE
+                + 4 * i
+            )
+
+            fs.seek(child_data_start)
+            fs.write(b'\0' * 4)
+            self.children_count -= 1
+            break
+
+
+
+
     # def save_children(
     #     self,
     #     fs: BinaryIO,

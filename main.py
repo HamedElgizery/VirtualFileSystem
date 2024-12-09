@@ -44,10 +44,12 @@ def do_fs_tests():
     config = Metadata(fs_name, 4096, 32, 1024 * 1024 * 1, 32)
     fs = FileSystem(fs_name, config)
 
-    for i in range(80):
+    for i in range(1):
         file_name = f"file_{i}.txt"
         file_data = b"my name is H H"
         fs.create_file(file_name, file_data, "/root")
+
+    fs.delete_file("/root/file_0.txt")
 
     fs.create_directory("a", "/root")
     fs.create_directory("b", "/root/a")
