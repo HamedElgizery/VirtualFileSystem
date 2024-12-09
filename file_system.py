@@ -454,6 +454,15 @@ class FileSystem:
 
         return None
 
+    def rename_file(self, old_dir: str, new_name: str) -> None:
+        file_node = self.resolve_path(old_dir)
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        file_node.file_name = new_name
+
+        self.write_to_index(file_node)
+
     def calculate_fragmentation(self):
         # Sort the file nodes by start block
         file_nodes = sorted(self.index.values(), key=lambda node: node.file_start_block)
