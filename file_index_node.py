@@ -22,7 +22,6 @@ class FileIndexNode:
         self.file_size: int = 0  # To be calculated dynamically
         self.is_directory = is_directory
         self.children_count = children_count
-        self.children = [] if is_directory else None
 
     def __repr__(self) -> str:
         return (
@@ -33,7 +32,7 @@ class FileIndexNode:
             f"file_size={self.file_size}\n"
             f"is_directory={self.is_directory}\n"
             f"children_count={self.children_count}\n"
-            f"children={self.children!r}\n"
+            # f"children={self.children!r}\n"
             f"==========================\n"
         )
 
@@ -112,11 +111,11 @@ class FileIndexNode:
 
     def load_children(
         self, fs: BinaryIO, config, index: Dict[int, "FileIndexNode"]
-    ) -> None:
+    ) -> List[int]:
 
         if not self.is_directory:
             return
-        self.children = []
+        children = []
         children_data_start = (
             config.BITMAP_SIZE
             + config.FILE_INDEX_SIZE
@@ -126,25 +125,42 @@ class FileIndexNode:
         for _ in range(self.children_count):
             child_indentifier = fs.read(4)
             child_node = index[int.from_bytes(child_indentifier, byteorder="big")]
-            self.children.append(child_node)
+            children.append(child_node)
 
-    def save_children(
-        self,
-        fs: BinaryIO,
-        BLOCK_SIZE: int,
-        config,
-        free_blocks_func: Callable[[int], List[int]],
-    ) -> None:
+        return children
+
+    def add_child(self, fs: BinaryIO, child: "FileIndexNode", config) -> None:
         if not self.is_directory:
             return
 
-        free_blocks_required = (len(self.children) * 4) // BLOCK_SIZE
-        # free_blocks = free_blocks_func(free_blocks_required)
         children_data_start = (
             config.BITMAP_SIZE
             + config.FILE_INDEX_SIZE
             + self.file_start_block * config.BLOCK_SIZE
+            + 4 * self.children_count
         )
+
         fs.seek(children_data_start)
-        for child in self.children:
-            fs.write(child.id.to_bytes(4, byteorder="big"))
+        fs.write(child.id.to_bytes(4, byteorder="big"))
+        self.children_count += 1
+
+    # def save_children(
+    #     self,
+    #     fs: BinaryIO,
+    #     BLOCK_SIZE: int,
+    #     config,
+    #     free_blocks_func: Callable[[int], List[int]],
+    # ) -> None:
+    #     if not self.is_directory:
+    #         return
+
+    #     free_blocks_required = (len(self.children) * 4) // BLOCK_SIZE
+    #     # free_blocks = free_blocks_func(free_blocks_required)
+    #     children_data_start = (
+    #         config.BITMAP_SIZE
+    #         + config.FILE_INDEX_SIZE
+    #         + self.file_start_block * config.BLOCK_SIZE
+    #     )
+    #     fs.seek(children_data_start)
+    #     for child in self.children:
+    #         fs.write(child.id.to_bytes(4, byteorder="big"))
