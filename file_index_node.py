@@ -129,7 +129,7 @@ class FileIndexNode:
 
         return children
 
-    def add_child(self, fs: BinaryIO, child: "FileIndexNode", config) -> None:
+    def add_child(self, fs: BinaryIO, child_to_write: "FileIndexNode", config) -> None:
         if not self.is_directory:
             return
 
@@ -140,8 +140,41 @@ class FileIndexNode:
             + 4 * self.children_count
         )
 
+        if 4 * (self.children_count + 1) >= self.file_blocks * config.BLOCK_SIZE:
+            children = self.load_children(fs, config, config.index)
+            config.free_block(self.file_start_block)
+
+            free_blocks = config.find_free_space_bitmap(self.file_blocks * 2)
+            start_block = free_blocks[0]
+
+            self.file_start_block = start_block
+            self.file_blocks = len(free_blocks)
+
+            children_data_start = (
+                config.BITMAP_SIZE
+                + config.FILE_INDEX_SIZE
+                + start_block * config.BLOCK_SIZE
+            )
+
+            for i, child in enumerate(children):
+                fs.seek(children_data_start + i * 4)
+                fs.write(child.id.to_bytes(4, byteorder="big"))
+
+            for block in free_blocks:
+                byte_index = block // 8
+                bit_index = block % 8
+                config.bitmap[byte_index] |= 1 << bit_index
+                config.update_bitmap(byte_index)
+
+        children_data_start = (
+            config.BITMAP_SIZE
+            + config.FILE_INDEX_SIZE
+            + self.file_start_block * config.BLOCK_SIZE
+            + 4 * self.children_count
+        )
+
         fs.seek(children_data_start)
-        fs.write(child.id.to_bytes(4, byteorder="big"))
+        fs.write(child_to_write.id.to_bytes(4, byteorder="big"))
         self.children_count += 1
 
     # def save_children(

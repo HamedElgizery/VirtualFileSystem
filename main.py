@@ -5,6 +5,9 @@ from metadata_utility import (
 from file_system import FileSystem
 
 
+# TODO: VERY IMPORTANT do boundary checks in this case we might as well make an interator for each block (index, bitmap, file_itself)
+
+
 def file_creation_test(fs: FileSystem):
     # Test: Write and overwrite a file
 
@@ -35,6 +38,12 @@ def do_fs_tests():
 
     config = Metadata(fs_name, 4096, 32, 1024 * 1024 * 1, 32)
     fs = FileSystem(fs_name, config)
+
+    for i in range(80):
+        file_name = f"file_{i}.txt"
+        file_data = b"my name is H H"
+        fs.create_file(file_name, file_data, "/root")
+
     fs.create_directory("a", "/root")
     fs.create_directory("b", "/root/a")
     fs.create_directory("c", "/root")

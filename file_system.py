@@ -48,6 +48,14 @@ class FileSystem:
     def __del__(self):
         self.fs.close()
 
+    @reset_seek_to_zero
+    def free_block(self, block_number: int) -> None:
+
+        self.bitmap[block_number // 8] &= ~(1 << (block_number % 8))
+        self.update_bitmap(block_number // 8)
+        self.fs.seek(block_number * self.BLOCK_SIZE)
+        self.fs.write(b"\0" * self.BLOCK_SIZE)
+
     def set_config(self, specs: Metadata):
         self.FILE_SYSTEM_PATH = specs.file_system_path
         self.FILE_INDEX_SIZE = specs.file_index_size
