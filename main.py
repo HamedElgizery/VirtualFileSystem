@@ -70,6 +70,10 @@ def do_fs_tests():
     file_data = b"my name is H H"
     fs.create_file(f"/root/{file_name}", file_data)
     dirs = fs.list_directory_contents("/root")
+    print(fs.read_file(f"/root/{file_name}"))
+    fs.edit_file(f"/root/{file_name}", b"this a new life makima my old")
+    print(fs.read_file(f"/root/{file_name}"))
+
     dirs.sort()
     if dirs[0] != "a" or dirs[1] != "c" or dirs[2] != "d":
         print("Error in directory creation test")

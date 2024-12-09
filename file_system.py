@@ -1,6 +1,6 @@
 import math
 import os
-from typing import List, Optional
+from typing import List, Optional, Union
 from file_index_node import FileIndexNode
 from metadata_utility import Metadata, MetadataManager
 from utility import reset_seek_to_zero
@@ -253,34 +253,28 @@ class FileSystem:
         self.write_to_index(file_index_node)
         self.write_to_index(parent_node)
 
-# adddED edit file 
+    # adddED edit file
 
-def edit_file(self, file_dir: str, new_data: bytes):
-    
-   
-    parent_node, file_node = self.resolve_path(file_dir, return_parent=True)
-    
-    if not file_node:
-        raise FileNotFoundError("File does not exist.")
-    if file_node.is_directory:
-        raise ValueError("The specified path is a directory.")
-    
-    
-    max_data_size = file_node.file_blocks * self.BLOCK_SIZE
-    if len(new_data) > max_data_size:
-        raise ValueError("New data exceeds the allocated file size. Please resize the file.")
-    
+    def edit_file(self, file_dir: str, new_data: bytes):
 
-    start_position = (
-        self.BITMAP_SIZE
-        + self.FILE_INDEX_SIZE
-        + file_node.file_start_block * self.BLOCK_SIZE
-    )
-    self.fs.seek(start_position)
-    self.fs.write(new_data.ljust(max_data_size, b"\0"))  
+        file_node = self.resolve_path(file_dir)
 
+        if not file_node:
+            raise FileNotFoundError("File does not exist.")
+        if file_node.is_directory:
+            raise ValueError("The specified path is a directory.")
 
-        
+        max_data_size = file_node.file_blocks * self.BLOCK_SIZE
+        if len(new_data) > max_data_size:
+            self.realign(file_node, len(new_data) // max_data_size)
+
+        start_position = (
+            self.BITMAP_SIZE
+            + self.FILE_INDEX_SIZE
+            + file_node.file_start_block * self.BLOCK_SIZE
+        )
+        self.fs.seek(start_position)
+        self.fs.write(new_data.ljust(max_data_size, b"\0"))
 
     @reset_seek_to_zero
     def update_bitmap(self, byte_index) -> None:
@@ -426,21 +420,28 @@ def edit_file(self, file_dir: str, new_data: bytes):
         children = dir_node.load_children(self)
         return [child.file_name for child in children]
 
+    # TODO: i need to centralize this shit i dont want some to work like this and some to work like that but oh well
     @reset_seek_to_zero
-    def read_file(self, file_index: FileIndexNode) -> bytes:
+    def read_file(self, file_dir: Union[str, FileIndexNode]) -> bytes:
+        if isinstance(file_dir, str):
+            file_node = self.resolve_path(file_dir)
+        elif isinstance(file_dir, FileIndexNode):
+            file_node = file_dir
+        else:
+            raise ValueError("File dir must be a str or FileIndexNode")
         self.fs.seek(
             self.BITMAP_SIZE
             + self.FILE_INDEX_SIZE
-            + file_index.file_start_block * self.BLOCK_SIZE
+            + file_node.file_start_block * self.BLOCK_SIZE
         )
         data = []
 
-        for i in range(file_index.file_blocks):
+        for i in range(file_node.file_blocks):
             data.append(self.fs.read(self.BLOCK_SIZE))
             self.fs.seek(
                 self.BITMAP_SIZE
                 + self.FILE_INDEX_SIZE
-                + file_index.file_start_block * self.BLOCK_SIZE
+                + file_node.file_start_block * self.BLOCK_SIZE
                 + i * self.BLOCK_SIZE
             )
 
