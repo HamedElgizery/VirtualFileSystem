@@ -2,6 +2,9 @@ from typing import BinaryIO, Callable, Dict, List
 from utility import reset_seek_to_zero
 
 
+# TODO: need to update code here a bit so it doesnt take the entire filesystem directly if it wants to do an operation or if it will just dont name it config and pass only methods it might need
+
+
 class FileIndexNode:
     id_generator = None
 

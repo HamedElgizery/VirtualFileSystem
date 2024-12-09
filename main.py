@@ -67,10 +67,6 @@ def do_fs_tests():
         print("Error in directory creation test")
 
 
-def create_new_file_system():
-    fs_name = "file.disk"
-
-
 if __name__ == "__main__":
 
     # various tests
