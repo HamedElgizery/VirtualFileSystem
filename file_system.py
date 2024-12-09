@@ -453,15 +453,34 @@ def edit_file(self, file_dir: str, new_data: bytes):
 
         return None
 
-    def get_fragmented_percentage(self) -> float:
-        non_continuous_blocks = 0
-        total_blocks = 0
-        for file in self.index.values():
-            total_blocks += file.file_blocks
-            current_block = file.file_start_block
-            for block in range(1, file.file_blocks):
-                if current_block + 1 != file.file_start_block + block:
-                    non_continuous_blocks += 1
-                current_block += 1
+    def calculate_fragmentation(self):
+        # Sort the file nodes by start block
+        file_nodes = sorted(self.index.values(), key=lambda node: node.file_start_block)
 
-        return (non_continuous_blocks / total_blocks) * 100 if total_blocks > 0 else 0
+        total_free_in_gaps = 0
+
+        # Iterate through sorted files to calculate gaps
+        for i in range(len(file_nodes) - 1):
+            current_file = file_nodes[i]
+            next_file = file_nodes[i + 1]
+
+            # Calculate the end block of the current file
+            current_end_block = (
+                current_file.file_start_block + current_file.file_blocks - 1
+            )
+
+            # Calculate the gap between the current file and the next file
+            gap = next_file.file_start_block - current_end_block - 1
+            if gap > 0:
+                total_free_in_gaps += gap
+
+        # Get the block number of the last file's last block
+        if file_nodes:
+            last_file = file_nodes[-1]
+            last_end_block = last_file.file_start_block + last_file.file_blocks - 1
+        else:
+            last_end_block = 0  # No files, so no fragmentation
+
+        # Calculate fragmentation percentage only up to the last used block
+        fragmentation_percentage = (total_free_in_gaps / (last_end_block + 1)) * 100
+        return fragmentation_percentage

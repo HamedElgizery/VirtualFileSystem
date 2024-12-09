@@ -50,6 +50,7 @@ def do_fs_tests():
         fs.create_file(f"/root/{file_name}", file_data)
 
     fs.delete_file("/root/file_0.txt")
+    print(fs.calculate_fragmentation())
 
     fs.create_directory("/root/a")
     fs.create_directory("/root/a/b")
@@ -72,8 +73,6 @@ def do_fs_tests():
     dirs.sort()
     if dirs[0] != "a" or dirs[1] != "c" or dirs[2] != "d":
         print("Error in directory creation test")
-
-    print(fs.get_fragmented_percentage())
 
 
 if __name__ == "__main__":
