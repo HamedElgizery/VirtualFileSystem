@@ -18,7 +18,7 @@ class BitmapManager:
         self.fs.seek(byte_index)
         self.fs.write(bytes([self.bitmap[byte_index]]))
 
-    def mark_blocks(self, blocks: Iterable[int], margin: Optional[int] = None):
+    def mark_blocks(self, blocks: Iterable[int], margin: Optional[int] = 0):
         for block in blocks:
             self.mark_used(margin + block)
 
@@ -27,7 +27,7 @@ class BitmapManager:
         self.fs.seek(block_number * self.block_size)
         self.fs.write(b"\0" * self.block_size)
 
-    def free_blocks(self, blocks: Iterable[int], margin: Optional[int] = None):
+    def free_blocks(self, blocks: Iterable[int], margin: Optional[int] = 0):
         for block in blocks:
             self.free_block(margin + block)
 

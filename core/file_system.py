@@ -118,18 +118,12 @@ class FileSystem:
             func_args=[range(file_node.file_blocks), file_node.file_start_block],
             rollback_args=[range(file_node.file_blocks), file_node.file_start_block],
         )
-
-        # for block in range(file_node.file_blocks):
-        #     self.bitmap_manager.free_block(file_node.file_start_block + block)
-
         self.transaction_manager.add_operation(
             parent_node.remove_child,
             rollback_func=parent_node.add_child,
             func_args=[self, file_node.file_name],
             rollback_args=[self, file_node],
         )
-
-        # parent_node.remove_child(self, file_node.file_name)
         self.transaction_manager.add_operation(
             self.index_manager.delete_from_index,
             rollback_func=self.index_manager.write_to_index,
@@ -138,8 +132,6 @@ class FileSystem:
         )
 
         self.transaction_manager.commit()
-
-        # self.index_manager.delete_from_index(file_node)
 
     @reset_seek_to_zero
     def reserve_file(self) -> None:
@@ -162,7 +154,14 @@ class FileSystem:
             raise Exception("Directory already exists.")
 
         free_block = self.bitmap_manager.find_free_space_bitmap(1)[0]
-        self.bitmap_manager.mark_used(free_block)
+
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.mark_used,
+            rollback_func=self.bitmap_manager.free_block,
+            func_args=[free_block],
+            rollback_args=[free_block],
+        )
+        # self.bitmap_manager.mark_used(free_block)
 
         new_dir_node = FileIndexNode(
             file_name=directories[-1],
@@ -171,10 +170,31 @@ class FileSystem:
             is_directory=True,
             children_count=0,
         )
-        parent_node.add_child(self, new_dir_node)
 
-        self.index_manager.write_to_index(new_dir_node)
-        self.index_manager.write_to_index(parent_node)
+        self.transaction_manager.add_operation(
+            parent_node.add_child,
+            rollback_func=parent_node.remove_child,
+            func_args=[self, new_dir_node],
+            rollback_args=[self, new_dir_node],
+        )
+        # parent_node.add_child(self, new_dir_node)
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[new_dir_node],
+            rollback_args=[new_dir_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+        self.transaction_manager.commit()
+        # self.index_manager.write_to_index(new_dir_node)
+        # self.index_manager.write_to_index(parent_node)
 
     def create_file(self, file_dir: str, file_data: bytes):
         directories = [d for d in file_dir.split("/") if d not in ("", ".")]
@@ -216,8 +236,12 @@ class FileSystem:
             current_offset += len(block_data)
 
         # Update bitmap to reflect that these blocks are now used
-        for block in free_blocks:
-            self.bitmap_manager.mark_used(block)
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.mark_blocks,
+            rollback_func=self.bitmap_manager.free_blocks,
+            func_args=[free_blocks],
+            rollback_args=[free_blocks],
+        )
 
         # Update the file index
         file_index_node = FileIndexNode(
@@ -225,12 +249,29 @@ class FileSystem:
             file_start_block=file_start_block_index,
             file_blocks=num_blocks_needed,
         )
-        file_index_node.calculate_file_size(self.config_manager.block_size)
 
-        parent_node.add_child(self, file_index_node)
+        self.transaction_manager.add_operation(
+            parent_node.add_child,
+            rollback_func=parent_node.remove_child,
+            func_args=[self, file_index_node],
+            rollback_args=[self, file_index_node.file_name],
+        )
 
-        self.index_manager.write_to_index(file_index_node)
-        self.index_manager.write_to_index(parent_node)
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[file_index_node],
+            rollback_args=[file_index_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+
+        self.transaction_manager.commit()
 
     # adddED edit file
 
