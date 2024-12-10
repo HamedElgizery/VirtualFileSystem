@@ -1,6 +1,6 @@
 import math
 import os
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 from structs.file_index_node import FileIndexNode
 from structs.metadata import Metadata
 from utility import reset_seek_to_zero
@@ -8,6 +8,7 @@ from managers.index_manager import IndexManager
 from managers.bitmap_manager import BitmapManager
 from managers.config_manager import ConfigManager
 from managers.metadata_manager import MetadataManager
+from managers.transaction_manager import TransactionManager
 
 # TODO: ensure no 2 file systems are open for the same file
 # TODO: ensure new code sepeartion works and try to make use of it
@@ -36,6 +37,7 @@ class FileSystem:
             self.fs, self.config_manager.num_blocks, self.config_manager.block_size
         )
         self.index_manager = IndexManager(self.fs, self.config_manager)
+        self.transaction_manager = TransactionManager()
 
         FileIndexNode.id_generator = lambda: self.metedata_manager.increment_id()
 
@@ -110,11 +112,34 @@ class FileSystem:
         if file_node.is_directory:
             raise ValueError("Not a file")
 
-        for block in range(file_node.file_blocks):
-            self.bitmap_manager.free_block(file_node.file_start_block + block)
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.free_blocks,
+            rollback_func=self.bitmap_manager.mark_used,
+            func_args=[range(file_node.file_blocks), file_node.file_start_block],
+            rollback_args=[range(file_node.file_blocks), file_node.file_start_block],
+        )
 
-        parent_node.remove_child(self, file_node.file_name)
-        self.index_manager.delete_from_index(file_node)
+        # for block in range(file_node.file_blocks):
+        #     self.bitmap_manager.free_block(file_node.file_start_block + block)
+
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+            func_args=[self, file_node.file_name],
+            rollback_args=[self, file_node],
+        )
+
+        # parent_node.remove_child(self, file_node.file_name)
+        self.transaction_manager.add_operation(
+            self.index_manager.delete_from_index,
+            rollback_func=self.index_manager.write_to_index,
+            func_args=[file_node],
+            rollback_args=[file_node],
+        )
+
+        self.transaction_manager.commit()
+
+        # self.index_manager.delete_from_index(file_node)
 
     @reset_seek_to_zero
     def reserve_file(self) -> None:
@@ -232,7 +257,7 @@ class FileSystem:
 
     def resolve_path(
         self, path: str, return_parent: bool = False
-    ) -> Optional[FileIndexNode]:
+    ) -> Union[FileIndexNode, Tuple[FileIndexNode, FileIndexNode]]:
         directories = [d for d in path.split("/") if d not in ("", ".")]
         current_id = 0 if path.startswith("/") else self.index_manager.index[0].id
         parent_id = 0 if path.startswith("/") else self.index_manager.index[0].id

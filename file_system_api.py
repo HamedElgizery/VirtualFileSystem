@@ -1,4 +1,30 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
+
+from core.file_system import FileSystem
+from transaction_manager import TransactionManager
+from dataclasses import dataclass
+import datetime
+
+
+@dataclass
+class FileMetadata:
+    file_name: str
+    file_size: int
+    is_directory: bool
+    children_count: Optional[int] = 0
+    creation_date: Optional[datetime.datetime] = None
+    modification_date: Optional[datetime.datetime] = None
+
+    def __post_init__(self):
+        """
+        Ensures that creation and modification dates are datetime objects.
+        """
+        if isinstance(self.creation_date, int):
+            self.creation_date = datetime.datetime.fromtimestamp(self.creation_date)
+        if isinstance(self.modification_date, int):
+            self.modification_date = datetime.datetime.fromtimestamp(
+                self.modification_date
+            )
 
 
 class FileSystemApi:
@@ -6,8 +32,9 @@ class FileSystemApi:
     This here serves as a handler for all the operations of the file system and should be used when interacting with it.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, user_id: str):
+        self.file_system = FileSystem(file_system_name=f"{user_id}_fs")
+        self.transaction_manager = TransactionManager()
 
     """
     File Operations.
@@ -192,3 +219,11 @@ class FileSystemApi:
 
     def defragmentation(self):
         pass
+
+    """
+    Custom Rollbacks.
+    """
+
+    def _rollback_delete(self, file_metadata: Dict[str, Any], file_data: bytes) -> None:
+        file_path = file_metadata["file_path"]
+        self.file_system.create_file(file_path, file_data)
