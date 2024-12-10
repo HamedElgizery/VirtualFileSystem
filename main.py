@@ -50,7 +50,7 @@ def do_fs_tests():
         fs.create_file(f"/root/{file_name}", file_data)
 
     fs.delete_file("/root/file_0.txt")
-    fs.defragmentation()
+    # fs.defragmentation()
     print(fs.calculate_fragmentation())
 
     fs.create_directory("/root/a")

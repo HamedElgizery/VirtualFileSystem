@@ -81,27 +81,29 @@ class FileIndexNode:
         offset_pointer += 4
 
         file_name_bytes = data[
-            offset_pointer : offset_pointer + file_system.FILE_NAME_SIZE
+            offset_pointer : offset_pointer + file_system.config_manager.file_name_size
         ]
-        offset_pointer += file_system.FILE_NAME_SIZE
+        offset_pointer += file_system.config_manager.file_name_size
 
         file_blocks_bytes = data[
-            offset_pointer : offset_pointer + file_system.MAX_FILE_BLOCKS
+            offset_pointer : offset_pointer + file_system.config_manager.max_file_blocks
         ]
-        offset_pointer += file_system.MAX_FILE_BLOCKS
+        offset_pointer += file_system.config_manager.max_file_blocks
 
         file_start_block_bytes = data[
-            offset_pointer : offset_pointer + file_system.FILE_START_BLOCK_INDEX_SIZE
+            offset_pointer : offset_pointer
+            + file_system.config_manager.file_start_block_index_size
         ]
-        offset_pointer += file_system.FILE_START_BLOCK_INDEX_SIZE
+        offset_pointer += file_system.config_manager.file_start_block_index_size
 
         is_directory_byte = data[offset_pointer : offset_pointer + 1]
         offset_pointer += 1
 
         children_count_bytes = data[
-            offset_pointer : offset_pointer + file_system.MAX_LENGTH_CHILDRENS
+            offset_pointer : offset_pointer
+            + file_system.config_manager.max_length_childrens
         ]
-        offset_pointer += file_system.MAX_LENGTH_CHILDRENS
+        offset_pointer += file_system.config_manager.max_length_childrens
 
         id = int.from_bytes(id_bytes, byteorder="big")
         file_name = file_name_bytes.rstrip(b"\x00").decode("utf-8")
@@ -114,7 +116,7 @@ class FileIndexNode:
             file_name, file_start_block, file_blocks, is_directory, children_count, True
         )
         instance.id = id
-        instance.calculate_file_size(file_system.BLOCK_SIZE)
+        instance.calculate_file_size(file_system.config_manager.block_size)
         return instance
 
     def load_children(self, file_system: "FileSystem") -> List["FileIndexNode"]:
@@ -123,14 +125,14 @@ class FileIndexNode:
             return
         children = []
         children_data_start = (
-            file_system.BITMAP_SIZE
-            + file_system.FILE_INDEX_SIZE
-            + self.file_start_block * file_system.BLOCK_SIZE
+            file_system.config_manager.bitmap_size
+            + file_system.config_manager.file_index_size
+            + self.file_start_block * file_system.config_manager.block_size
         )
         file_system.fs.seek(children_data_start)
         for _ in range(self.children_count):
             child_indentifier = file_system.fs.read(4)
-            child_node = file_system.index[
+            child_node = file_system.index_manager.index[
                 int.from_bytes(child_indentifier, byteorder="big")
             ]
             children.append(child_node)
@@ -144,19 +146,22 @@ class FileIndexNode:
             return
 
         children_data_start = (
-            file_system.BITMAP_SIZE
-            + file_system.FILE_INDEX_SIZE
-            + self.file_start_block * file_system.BLOCK_SIZE
+            file_system.config_manager.bitmap_size
+            + file_system.config_manager.file_index_size
+            + self.file_start_block * file_system.config_manager.block_size
             + 4 * self.children_count
         )
 
-        if 4 * (self.children_count + 1) >= self.file_blocks * file_system.BLOCK_SIZE:
+        if (
+            4 * (self.children_count + 1)
+            >= self.file_blocks * file_system.config_manager.block_size
+        ):
             file_system.realign(self)
 
         children_data_start = (
-            file_system.BITMAP_SIZE
-            + file_system.FILE_INDEX_SIZE
-            + self.file_start_block * file_system.BLOCK_SIZE
+            file_system.config_manager.bitmap_size
+            + file_system.config_manager.file_index_size
+            + self.file_start_block * file_system.config_manager.block_size
             + 4 * self.children_count
         )
 
@@ -169,14 +174,14 @@ class FileIndexNode:
         children = self.load_children(file_system)
         shifting = False
         for i, child in enumerate(children):
-            if file_system.index[child.id].file_name == child_dir:
+            if file_system.index_manager.index[child.id].file_name == child_dir:
                 shifting = True
                 continue
 
             child_data_start = (
-                file_system.BITMAP_SIZE
-                + file_system.FILE_INDEX_SIZE
-                + self.file_start_block * file_system.BLOCK_SIZE
+                file_system.config_manager.bitmap_size
+                + file_system.config_manager.file_index_size
+                + self.file_start_block * file_system.config_manager.block_size
                 + 4 * (i - (1 if shifting else 0))
             )
 
