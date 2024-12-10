@@ -63,7 +63,7 @@ class FileIndexNode:
         )
 
     def calculate_file_size(self, block_size: int):
-        self.file_size = self.file_blocks * block_size
+        return self.file_blocks * block_size
 
     def to_bytes(
         self,
@@ -228,3 +228,12 @@ class FileIndexNode:
             file_system.fs.write(child.id.to_bytes(4, byteorder="big"))
 
         self.children_count -= 1
+
+    # def remove_all_children(self, file_system: "FileSystem") -> None:
+    #     file_system.bitmap_manager.free_blocks(
+    #         range(
+    #             self.file_start_block + 1, self.file_start_block + 1 + self.file_blocks
+    #         )
+    #     )
+    #     self.children_count = 0
+    #     self.file_blocks = 1

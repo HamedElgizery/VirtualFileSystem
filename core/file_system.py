@@ -53,148 +53,9 @@ class FileSystem:
     def __del__(self):
         self.fs.close()
 
-    # TODO: add a method which will also automically copy all the older blocks and expand
-    def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
-        if file_index.is_directory:
-            children = file_index.load_children(self)
-            self.bitmap_manager.free_block(file_index.file_start_block)
-
-            free_blocks = self.bitmap_manager.find_free_space_bitmap(
-                file_index.file_blocks * factor
-            )
-            start_block = free_blocks[0]
-
-            file_index.file_start_block = start_block
-            file_index.file_blocks = len(free_blocks)
-
-            children_data_start = (
-                self.config_manager.bitmap_size
-                + self.config_manager.file_index_size
-                + start_block * self.config_manager.block_size
-            )
-
-            for i, child in enumerate(children):
-                self.fs.seek(children_data_start + i * 4)
-                self.fs.write(child.id.to_bytes(4, byteorder="big"))
-
-            for block in free_blocks:
-                self.bitmap_manager.mark_used(block)
-
-        else:
-            file_data = self.read_file(file_index)
-            self.bitmap_manager.free_block(file_index.file_start_block)
-
-            free_blocks = self.bitmap_manager.find_free_space_bitmap(
-                file_index.file_blocks * factor
-            )
-            start_block = free_blocks[0]
-
-            file_index.file_start_block = start_block
-            file_index.file_blocks = len(free_blocks)
-
-            file_data_start = (
-                self.config_manager.bitmap_size
-                + self.config_manager.file_index_size
-                + start_block * self.config_manager.block_size
-            )
-
-            self.fs.seek(file_data_start)
-            self.fs.write(file_data.ljust(self.config_manager.block_size, b"\0"))
-
-            for block in free_blocks:
-                self.bitmap_manager.mark_used(block)
-
-    def delete_file(self, file_dir: str) -> None:
-        parent_node, file_node = self.resolve_path(file_dir, True)
-
-        if not file_node:
-            raise ValueError("File doesn't exist")
-        if file_node.is_directory:
-            raise ValueError("Not a file")
-
-        self.transaction_manager.add_operation(
-            self.bitmap_manager.free_blocks,
-            rollback_func=self.bitmap_manager.mark_used,
-            func_args=[range(file_node.file_blocks), file_node.file_start_block],
-            rollback_args=[range(file_node.file_blocks), file_node.file_start_block],
-        )
-        self.transaction_manager.add_operation(
-            parent_node.remove_child,
-            rollback_func=parent_node.add_child,
-            func_args=[self, file_node.file_name],
-            rollback_args=[self, file_node],
-        )
-        self.transaction_manager.add_operation(
-            self.index_manager.delete_from_index,
-            rollback_func=self.index_manager.write_to_index,
-            func_args=[file_node],
-            rollback_args=[file_node],
-        )
-
-        self.transaction_manager.commit()
-
-    @reset_seek_to_zero
-    def reserve_file(self) -> None:
-        self.fs.seek(
-            self.config_manager.bitmap_size
-            + self.config_manager.file_index_size
-            + self.config_manager.file_system_size
-            - 1
-        )
-        self.fs.write(b"\0")
-
-    def create_directory(self, dir_name: str):
-        # parent_node = self.get_file_by_name(parent_dir_name)
-        directories = [d for d in dir_name.split("/") if d not in ("", ".")]
-        parent_node = self.resolve_path(directories[-2])
-        if not parent_node or not parent_node.is_directory:
-            raise Exception("Parent directory does not exist or is not a directory.")
-        children = parent_node.load_children(self)
-        if any(child.file_name == directories[-1] for child in children):
-            raise Exception("Directory already exists.")
-
-        free_block = self.bitmap_manager.find_free_space_bitmap(1)[0]
-
-        self.transaction_manager.add_operation(
-            self.bitmap_manager.mark_used,
-            rollback_func=self.bitmap_manager.free_block,
-            func_args=[free_block],
-            rollback_args=[free_block],
-        )
-        # self.bitmap_manager.mark_used(free_block)
-
-        new_dir_node = FileIndexNode(
-            file_name=directories[-1],
-            file_start_block=free_block,
-            file_blocks=1,
-            is_directory=True,
-            children_count=0,
-        )
-
-        self.transaction_manager.add_operation(
-            parent_node.add_child,
-            rollback_func=parent_node.remove_child,
-            func_args=[self, new_dir_node],
-            rollback_args=[self, new_dir_node],
-        )
-        # parent_node.add_child(self, new_dir_node)
-
-        self.transaction_manager.add_operation(
-            self.index_manager.write_to_index,
-            rollback_func=self.index_manager.delete_from_index,
-            func_args=[new_dir_node],
-            rollback_args=[new_dir_node],
-        )
-
-        self.transaction_manager.add_operation(
-            self.index_manager.write_to_index,
-            rollback_func=self.index_manager.delete_from_index,
-            func_args=[parent_node],
-            rollback_args=[parent_node],
-        )
-        self.transaction_manager.commit()
-        # self.index_manager.write_to_index(new_dir_node)
-        # self.index_manager.write_to_index(parent_node)
+    """
+    File Operations.
+    """
 
     def create_file(self, file_dir: str, file_data: bytes):
         directories = [d for d in file_dir.split("/") if d not in ("", ".")]
@@ -211,15 +72,30 @@ class FileSystem:
 
         # TODO: later on we will make use of path so for parent_dir it will take a path and we will check files or folders in it to see if name exists or not
         # Check if the file exists
-        existing_file = self.index_manager.find_file_by_name(directories[-1])
+        existing_file = next(
+            (
+                child
+                for child in parent_node.load_children(self)
+                if child.file_name == directories[-1]
+            ),
+            None,
+        )
 
         if existing_file:
             # Free up the blocks used by the existing file in the bitmap
-            for block in range(
-                existing_file.file_start_block,
-                existing_file.file_start_block + existing_file.file_blocks,
-            ):
-                self.bitmap_manager.free_block(block)
+            raise Exception("File already exists.")
+            # self.transaction_manager.add_operation(
+            #     self.bitmap_manager.free_blocks,
+            #     rollback_func=self.bitmap_manager.mark_blocks,
+            #     func_args=[
+            #         range(existing_file.file_blocks),
+            #         existing_file.file_start_block,
+            #     ],
+            #     rollback_args=[
+            #         range(existing_file.file_blocks),
+            #         existing_file.file_start_block,
+            #     ],
+            # )
 
         # Write the new data to free blocks
         current_offset = 0
@@ -273,7 +149,30 @@ class FileSystem:
 
         self.transaction_manager.commit()
 
-    # adddED edit file
+    def read_file(self, file_dir: Union[str, FileIndexNode]) -> bytes:
+        if isinstance(file_dir, str):
+            file_node = self.resolve_path(file_dir)
+        elif isinstance(file_dir, FileIndexNode):
+            file_node = file_dir
+        else:
+            raise ValueError("File dir must be a str or FileIndexNode")
+        self.fs.seek(
+            self.config_manager.bitmap_size
+            + self.config_manager.file_index_size
+            + file_node.file_start_block * self.config_manager.block_size
+        )
+        data = []
+
+        for i in range(file_node.file_blocks):
+            data.append(self.fs.read(self.config_manager.block_size))
+            self.fs.seek(
+                self.config_manager.bitmap_size
+                + self.config_manager.file_index_size
+                + file_node.file_start_block * self.config_manager.block_size
+                + i * self.config_manager.block_size
+            )
+
+        return b"".join(data).rstrip(b"\x00")
 
     def edit_file(self, file_dir: str, new_data: bytes):
 
@@ -295,6 +194,221 @@ class FileSystem:
         )
         self.fs.seek(start_position)
         self.fs.write(new_data.ljust(max_data_size, b"\0"))
+
+    def delete_file(self, file_dir: str) -> None:
+        parent_node, file_node = self.resolve_path(file_dir, True)
+
+        if not file_node:
+            raise ValueError("File doesn't exist")
+        if file_node.is_directory:
+            raise ValueError("Not a file")
+
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.free_blocks,
+            rollback_func=self.bitmap_manager.mark_used,
+            func_args=[range(file_node.file_blocks), file_node.file_start_block],
+            rollback_args=[range(file_node.file_blocks), file_node.file_start_block],
+        )
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+            func_args=[self, file_node.file_name],
+            rollback_args=[self, file_node],
+        )
+        self.transaction_manager.add_operation(
+            self.index_manager.delete_from_index,
+            rollback_func=self.index_manager.write_to_index,
+            func_args=[file_node],
+            rollback_args=[file_node],
+        )
+
+        self.transaction_manager.commit()
+
+    """
+    Directory Operations
+    """
+
+    def create_directory(self, dir_name: str):
+        # parent_node = self.get_file_by_name(parent_dir_name)
+        directories = [d for d in dir_name.split("/") if d not in ("", ".")]
+        parent_node = self.resolve_path(directories[-2])
+        if not parent_node or not parent_node.is_directory:
+            raise Exception("Parent directory does not exist or is not a directory.")
+        children = parent_node.load_children(self)
+        if any(child.file_name == directories[-1] for child in children):
+            raise Exception("Directory already exists.")
+
+        free_block = self.bitmap_manager.find_free_space_bitmap(1)[0]
+
+        new_dir_node = FileIndexNode(
+            file_name=directories[-1],
+            file_start_block=free_block,
+            file_blocks=1,
+            is_directory=True,
+            children_count=0,
+        )
+
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.mark_used,
+            rollback_func=self.bitmap_manager.free_block,
+            func_args=[free_block],
+            rollback_args=[free_block],
+        )
+
+        self.transaction_manager.add_operation(
+            parent_node.add_child,
+            rollback_func=parent_node.remove_child,
+            func_args=[self, new_dir_node],
+            rollback_args=[self, new_dir_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[new_dir_node],
+            rollback_args=[new_dir_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+        self.transaction_manager.commit()
+
+    def list_directory_contents(self, dir_name: str) -> List[str]:
+        # dir_node = self.get_file_by_name(dir_name)
+        dir_node = self.resolve_path(dir_name)
+        if not dir_node or not dir_node.is_directory:
+            raise Exception("Directory does not exist or is not a directory.")
+
+        children = dir_node.load_children(self)
+        return [child.file_name for child in children]
+
+    def delete_directory(self, dir_path: str) -> None:
+        parent_node, dir_node = self.resolve_path(dir_path, True)
+        children = dir_node.load_children(self)
+
+        if not dir_node:
+            raise ValueError("Directory doesn't exist")
+        if not dir_node.is_directory:
+            raise ValueError("Not a directory")
+
+        self.transaction_manager.add_operation(
+            self.bitmap_manager.free_blocks,
+            rollback_func=self.bitmap_manager.mark_used,
+            func_args=[range(dir_node.file_blocks), dir_node.file_start_block],
+            rollback_args=[range(dir_node.file_blocks), dir_node.file_start_block],
+        )
+
+        for child in children:
+            self.transaction_manager.add_operation(
+                self.bitmap_manager.free_blocks,
+                rollback_func=self.bitmap_manager.mark_used,
+                func_args=[range(child.file_blocks), child.file_start_block],
+                rollback_args=[range(child.file_blocks), child.file_start_block],
+            )
+
+            self.transaction_manager.add_operation(
+                self.index_manager.delete_from_index,
+                rollback_func=self.index_manager.write_to_index,
+                func_args=[child],
+                rollback_args=[child],
+            )
+
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+            func_args=[self, parent_node.file_name],
+            rollback_args=[self, parent_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.delete_from_index,
+            rollback_func=self.index_manager.write_to_index,
+            func_args=[dir_node],
+            rollback_args=[dir_node],
+        )
+
+        self.transaction_manager.commit()
+
+    def move_directory(self, dir_path: str, new_dir_path: str) -> None:
+        parent_node, dir_node = self.resolve_path(dir_path, True)
+        new_parent_node, new_dir_node = self.resolve_path(new_dir_path, True)
+
+        if not dir_node:
+            raise ValueError("Directory doesn't exist")
+        if not dir_node.is_directory:
+            raise ValueError("Not a directory")
+
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+        )
+
+    # TODO: add a method which will also automically copy all the older blocks and expand
+    def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
+        if file_index.is_directory:
+            children = file_index.load_children(self)
+            self.bitmap_manager.free_block(file_index.file_start_block)
+
+            free_blocks = self.bitmap_manager.find_free_space_bitmap(
+                file_index.file_blocks * factor
+            )
+            start_block = free_blocks[0]
+
+            file_index.file_start_block = start_block
+            file_index.file_blocks = len(free_blocks)
+
+            children_data_start = (
+                self.config_manager.bitmap_size
+                + self.config_manager.file_index_size
+                + start_block * self.config_manager.block_size
+            )
+
+            for i, child in enumerate(children):
+                self.fs.seek(children_data_start + i * 4)
+                self.fs.write(child.id.to_bytes(4, byteorder="big"))
+
+            for block in free_blocks:
+                self.bitmap_manager.mark_used(block)
+
+        else:
+            file_data = self.read_file(file_index)
+            self.bitmap_manager.free_block(file_index.file_start_block)
+
+            free_blocks = self.bitmap_manager.find_free_space_bitmap(
+                file_index.file_blocks * factor
+            )
+            start_block = free_blocks[0]
+
+            file_index.file_start_block = start_block
+            file_index.file_blocks = len(free_blocks)
+
+            file_data_start = (
+                self.config_manager.bitmap_size
+                + self.config_manager.file_index_size
+                + start_block * self.config_manager.block_size
+            )
+
+            self.fs.seek(file_data_start)
+            self.fs.write(file_data.ljust(self.config_manager.block_size, b"\0"))
+
+            for block in free_blocks:
+                self.bitmap_manager.mark_used(block)
+
+    @reset_seek_to_zero
+    def reserve_file(self) -> None:
+        self.fs.seek(
+            self.config_manager.bitmap_size
+            + self.config_manager.file_index_size
+            + self.config_manager.file_system_size
+            - 1
+        )
+        self.fs.write(b"\0")
+
+    # adddED edit file
 
     def resolve_path(
         self, path: str, return_parent: bool = False
@@ -340,41 +454,11 @@ class FileSystem:
     def list_all_files(self) -> List[FileIndexNode]:
         return list(self.index_manager.index.values())
 
-    def list_directory_contents(self, dir_name: str) -> List[str]:
-        # dir_node = self.get_file_by_name(dir_name)
-        dir_node = self.resolve_path(dir_name)
-        if not dir_node or not dir_node.is_directory:
-            raise Exception("Directory does not exist or is not a directory.")
-
-        children = dir_node.load_children(self)
-        return [child.file_name for child in children]
-
     # TODO: i need to centralize this shit i dont want some to work like this and some to work like that but oh well
-    @reset_seek_to_zero
-    def read_file(self, file_dir: Union[str, FileIndexNode]) -> bytes:
-        if isinstance(file_dir, str):
-            file_node = self.resolve_path(file_dir)
-        elif isinstance(file_dir, FileIndexNode):
-            file_node = file_dir
-        else:
-            raise ValueError("File dir must be a str or FileIndexNode")
-        self.fs.seek(
-            self.config_manager.bitmap_size
-            + self.config_manager.file_index_size
-            + file_node.file_start_block * self.config_manager.block_size
-        )
-        data = []
 
-        for i in range(file_node.file_blocks):
-            data.append(self.fs.read(self.config_manager.block_size))
-            self.fs.seek(
-                self.config_manager.bitmap_size
-                + self.config_manager.file_index_size
-                + file_node.file_start_block * self.config_manager.block_size
-                + i * self.config_manager.block_size
-            )
-
-        return b"".join(data).rstrip(b"\x00")
+    def get_file_size(self, file_dir: str) -> int:
+        file_node = self.resolve_path(file_dir)
+        return file_node.file_blocks * self.config_manager.block_size
 
     def find_file_by_name(self, file_name: str) -> Optional[FileIndexNode]:
         for file_index in self.index_manager.index.values():
@@ -400,12 +484,43 @@ class FileSystem:
         self.create_file(new_dir, self.read_file(old_dir))
 
     def move_file(self, old_dir: str, new_dir: str) -> None:
-        file_node = self.resolve_path(old_dir)
+        parent_node, file_node = self.resolve_path(old_dir, True)
+        target_node = self.resolve_path(new_dir)
         if not file_node:
             raise FileNotFoundError(f"File '{old_dir}' not found.")
 
-        self.copy_file(old_dir, new_dir)
-        self.delete_file(old_dir)
+        if not target_node:
+            raise Exception(f"Target directory '{new_dir}' not found.")
+
+        if not target_node.is_directory:
+            raise FileNotFoundError(f"{file_node} is not a directory.")
+
+        if file_node.file_name in target_node.load_children(self):
+            raise Exception(
+                f"File '{file_node.file_name}' already exists in '{new_dir}'."
+            )
+
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+            func_args=[self, file_node.file_name],
+            rollback_args=[self, file_node],
+        )
+
+        self.transaction_manager.add_operation(
+            target_node.add_child,
+            rollback_func=target_node.remove_child,
+            func_args=[self, file_node],
+            rollback_args=[self, file_node],
+        )
+
+        self.transaction_manager.commit()
+
+        # parent_node.remove_child(self, file_node.file_name)
+        # target_node.add_child(self, file_node)
+
+        # self.copy_file(old_dir, new_dir)
+        # self.delete_file(old_dir)
 
     def calculate_fragmentation(self):
         # Sort the file nodes by start block

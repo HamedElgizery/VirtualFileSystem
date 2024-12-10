@@ -44,12 +44,26 @@ def do_fs_tests():
     config = Metadata(fs_name, 1024 * 1024, 32, 1024 * 1024 * 80, 32)
     fs = FileSystem(fs_name, config)
 
-    for i in range(9):
+    fs.create_directory("/root/f")
+
+    for i in range(100):
         file_name = f"file_{i}.txt"
         file_data = b"my name is H H"
-        fs.create_file(f"/root/{file_name}", file_data)
+        fs.create_file(f"/root/f/{file_name}", file_data)
 
-    fs.delete_file("/root/file_0.txt")
+    fs.delete_file("/root/f/file_0.txt")
+
+    # TODO: oi so here ensure that move moves basically the entire path fs.move_file("/root/f/file_1.txt", "/root/file_1.txt")
+    # TODO: also ensure that the remove child and add child have the same args none of that shitty shitty stuff alright ?
+
+    fs.move_file("/root/f/file_1.txt", "/root")
+    files = fs.list_directory_contents("/root")
+
+    # fs.delete_directory("/root/f")
+
+    fs.create_file("/root/file_0.txt", file_data * 12)
+    # fs.create_file("/root/file_0.txt", file_data * 42)
+
     # fs.defragmentation()
     print(fs.calculate_fragmentation())
 

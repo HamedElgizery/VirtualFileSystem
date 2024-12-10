@@ -9,6 +9,7 @@ import datetime
 @dataclass
 class FileMetadata:
     file_name: str
+    file_path: str
     file_size: int
     is_directory: bool
     children_count: Optional[int] = 0
@@ -34,7 +35,6 @@ class FileSystemApi:
 
     def __init__(self, user_id: str):
         self.file_system = FileSystem(file_system_name=f"{user_id}_fs")
-        self.transaction_manager = TransactionManager()
 
     """
     File Operations.
@@ -46,7 +46,7 @@ class FileSystemApi:
 
         :param file_path: The path where the new empty file will be created.
         """
-        pass
+        self.file_system.create_file(file_path, b"")
 
     def create_file(self, file_path: str, file_data: bytes) -> None:
         """
@@ -55,7 +55,7 @@ class FileSystemApi:
         :param file_path: The path where the new file will be created.
         :param file_data: The data to be written to the new file.
         """
-        pass
+        self.file_system.create_file(file_path, file_data)
 
     def read_file(self, file_path: str) -> bytes:
         """
@@ -64,7 +64,7 @@ class FileSystemApi:
         :param file_path: The path of the file to be read.
         :return: The contents of the file as bytes.
         """
-        pass
+        return self.file_system.read_file(file_path)
 
     def edit_file(self, file_path: str, new_data: bytes) -> None:
         """
@@ -73,7 +73,7 @@ class FileSystemApi:
         :param file_path: The path of the file to be edited.
         :param new_data: The new data to overwrite the existing file content.
         """
-        pass
+        self.file_system.edit_file(file_path, new_data)
 
     def delete_file(self, file_path: str) -> None:
         """
@@ -81,7 +81,7 @@ class FileSystemApi:
 
         :param file_path: The path of the file to be deleted.
         """
-        pass
+        self.file_system.delete_file(file_path)
 
     def rename_file(self, file_path: str, new_name: str) -> None:
         """
@@ -90,7 +90,7 @@ class FileSystemApi:
         :param file_path: The current path of the file to be renamed.
         :param new_name: The new name for the file.
         """
-        pass
+        self.file_system.rename_file(file_path, new_name)
 
     def move_file(self, file_path: str, new_path: str) -> None:
         """
@@ -99,7 +99,7 @@ class FileSystemApi:
         :param file_path: The current path of the file to be moved.
         :param new_path: The new path where the file will be moved.
         """
-        pass
+        self.file_system.move_file(file_path, new_path)
 
     def copy_file(self, file_path: str, copy_path: str) -> None:
         """
@@ -108,18 +108,28 @@ class FileSystemApi:
         :param file_path: The current path of the file to be copied.
         :param copy_path: The path where the file will be copied to.
         """
-        pass
+        self.file_system.copy_file(file_path, copy_path)
 
     # Will create a simple metadata for each file with timecreated, modification date file size etc
 
-    def get_file_metadata(self, file_path: str) -> Dict[str, Any]:
+    def get_file_metadata(self, file_path: str) -> "FileMetadata":
         """
         Returns a dictionary containing metadata for the given file.
 
         :param file_path: The path of the file to retrieve metadata for.
         :return: A dictionary containing file metadata.
         """
-        pass
+        index_node = self.file_system.index_manager.find_file_by_name(file_path)
+        file_metadata = FileMetadata(
+            file_name=index_node.file_name,
+            file_path=index_node.file_path,
+            file_size=index_node.file_size,
+            is_directory=index_node.is_directory,
+            children_count=index_node.children_count,
+            creation_date=index_node.creation_date,
+            modification_date=index_node.modification_date,
+        )
+        return file_metadata
 
     def get_file_size(self, file_path: str) -> int:
         """
@@ -128,7 +138,7 @@ class FileSystemApi:
         :param file_path: The path of the file to retrieve size for.
         :return: The size of the file in bytes.
         """
-        pass
+        return self.file_system.get_file_size(file_path)
 
     """
     Directory Operations.
@@ -140,7 +150,7 @@ class FileSystemApi:
 
         :param dir_path: The path of the new directory to create.
         """
-        pass
+        self.file_system.create_directory(dir_path)
 
     def list_directory_contents(self, dir_path: str) -> List[str]:
         """
@@ -149,7 +159,8 @@ class FileSystemApi:
         :param dir_path: The path of the directory to list contents for.
         :return: A list of the contents of the given directory.
         """
-        pass
+        files = self.file_system.list_directory_contents(dir_path)
+        return files
 
     def delete_directory(self, dir_path: str) -> None:
         """
@@ -157,7 +168,7 @@ class FileSystemApi:
 
         :param dir_path: The path of the directory to delete.
         """
-        pass
+        self.file_system.delete_directory(dir_path)
 
     def rename_directory(self, dir_path: str, new_name: str) -> None:
         """
@@ -166,7 +177,7 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be renamed.
         :param new_name: The new name for the directory.
         """
-        pass
+        self.file_system.rename_file(dir_path, new_name)
 
     def move_directory(self, dir_path: str, new_path: str) -> None:
         """
@@ -175,7 +186,7 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be moved.
         :param new_path: The new path where the directory will be moved.
         """
-        pass
+        self.file_system.move_file(dir_path, new_path)
 
     def copy_directory(self, dir_path: str, copy_path: str) -> None:
         """
@@ -223,7 +234,3 @@ class FileSystemApi:
     """
     Custom Rollbacks.
     """
-
-    def _rollback_delete(self, file_metadata: Dict[str, Any], file_data: bytes) -> None:
-        file_path = file_metadata["file_path"]
-        self.file_system.create_file(file_path, file_data)

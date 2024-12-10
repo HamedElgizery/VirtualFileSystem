@@ -1,6 +1,7 @@
 class TransactionManager:
     def __init__(self):
         self.operations = []
+        self.active_transaction = False
 
     def add_operation(
         self, func, rollback_func=None, func_args=None, rollback_args=None
@@ -23,6 +24,12 @@ class TransactionManager:
         )
 
     def commit(self):
+
+        if self.active_transaction:
+            # If already inside a transaction, skip committing
+            return
+
+        self.active_transaction = True
         executed_operations = []
         try:
             for operation in self.operations:
@@ -34,6 +41,7 @@ class TransactionManager:
             raise e  # Re-raise the exception
         finally:
             self.operations.clear()
+            self.active_transaction = False
 
     def rollback(self, executed_operations):
 
