@@ -1,8 +1,8 @@
 import os
-from metadata_utility import (
+from structs.metadata import (
     Metadata,
 )
-from file_system import FileSystem
+from core.file_system import FileSystem
 
 
 # TODO: VERY IMPORTANT do boundary checks in this case we might as well make an interator for each block (index, bitmap, file_itself)
@@ -34,7 +34,7 @@ def file_creation_test(fs: FileSystem):
 
 
 def do_fs_tests():
-    fs_name = "file.disk"
+    fs_name = "file_system_disk/file.disk"
     if os.path.exists(fs_name):
         os.remove(fs_name)
 

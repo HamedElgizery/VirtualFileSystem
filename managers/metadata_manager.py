@@ -1,15 +1,5 @@
+from structs.metadata import Metadata
 import os
-from dataclasses import dataclass
-
-
-@dataclass
-class Metadata:
-    file_system_path: str
-    file_index_size: int
-    block_size: int
-    file_system_size: int
-    file_name_size: int
-    current_id: int = 1
 
 
 class MetadataManager:
@@ -64,28 +54,3 @@ class MetadataManager:
     def current_id(self, value):
         self.metadata.current_id = value
         self.write_metadata_file()
-
-
-# class MetadataManager:
-#     def __init__(self, file_path):
-#         self.file_path = file_path
-#         self.f = open(f"{self.file_path}.dt", "r+")
-#         self.f.seek(-1, os.SEEK_END)
-#         self.current_id = int(self.f.read(1))
-
-#     def __del__(self):
-#         self.f.close()
-
-#     def update_id(self):
-#         self.current_id += 1
-#         self.f.seek(-1, os.SEEK_END)
-#         self.f.write(str(self.current_id))
-#         self.f.flush()
-
-#     @property
-#     def current_id(self):
-#         return self._current_id
-
-#     @current_id.setter
-#     def current_id(self, value):
-#         self._current_id = value

@@ -1,5 +1,6 @@
-from config_manager import ConfigManager
-from file_index_node import FileIndexNode
+import time
+from managers.config_manager import ConfigManager
+from structs.file_index_node import FileIndexNode
 
 
 class IndexManager:
@@ -31,6 +32,7 @@ class IndexManager:
         if len(file_index.file_name) > self.config_manager.file_name_size:
             raise ValueError("File name too long.")
 
+        file_index.modification_date = int(round(time.time()))
         if file_index.id in self.index:
             self.index[file_index.id] = file_index
             self.index_locations[file_index.id] = file_index.file_start_block
@@ -39,6 +41,7 @@ class IndexManager:
                 + self.index_locations[file_index.id]
                 * self.config_manager.index_entry_size
             )
+
             self.fs.write(
                 file_index.to_bytes(
                     self.config_manager.file_name_size,
@@ -81,11 +84,9 @@ class IndexManager:
         raise Exception("No space in file index.")
 
     def find_file_by_id(self, file_id: int) -> FileIndexNode:
-
         return self.index.get(file_id)
 
     def find_file_by_name(self, file_name: str) -> FileIndexNode:
-
         for file_index in self.index.values():
             if file_index.file_name == file_name:
                 return file_index
@@ -95,7 +96,6 @@ class IndexManager:
         return list(self.index.values())
 
     def delete_from_index(self, file_index: FileIndexNode) -> None:
-
         if file_index.id not in self.index:
             return
 

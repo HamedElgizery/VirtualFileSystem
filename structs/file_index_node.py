@@ -1,9 +1,10 @@
-from typing import BinaryIO, Callable, Dict, List
+from typing import BinaryIO, Callable, Dict, List, Optional
 from utility import reset_seek_to_zero
 from typing import TYPE_CHECKING
+import time
 
 if TYPE_CHECKING:
-    from file_system import FileSystem
+    from core.file_system import FileSystem
 
 # TODO: need to update code here a bit so it doesnt take the entire filesystem directly if it wants to do an operation or if it will just dont name it config and pass only methods it might need
 
@@ -16,9 +17,11 @@ class FileIndexNode:
         file_name: str,
         file_start_block: int,
         file_blocks: int,
-        is_directory: bool = False,
-        children_count: int = 0,
-        no_id: bool = False,
+        is_directory: Optional[bool] = False,
+        children_count: Optional[int] = 0,
+        no_id: Optional[bool] = False,
+        creation_date: Optional[int] = None,
+        modification_date: Optional[int] = None,
     ) -> None:
         if not no_id:
             self.id = FileIndexNode.id_generator()
@@ -27,7 +30,24 @@ class FileIndexNode:
         self.file_blocks: int = file_blocks
         self.file_size: int = 0  # To be calculated dynamically
         self.is_directory = is_directory
+
+        self.set_dates(creation_date, modification_date)
         self.children_count = children_count
+
+    def set_dates(
+        self,
+        creation_date: Optional[int] = None,
+        modification_date: Optional[int] = None,
+    ):
+        if creation_date == None:
+            self.creation_date = int(round(time.time()))
+        else:
+            self.creation_date = creation_date
+
+        if modification_date == None:
+            self.modification_date = int(round(time.time()))
+        else:
+            self.modification_date = modification_date
 
     def __repr__(self) -> str:
         return (
@@ -52,6 +72,7 @@ class FileIndexNode:
         FILE_START_BLOCK_INDEX_SIZE,
         MAX_LENGTH_CHILDRENS,
     ) -> bytes:
+        id_bytes = self.id.to_bytes(4, byteorder="big")
         file_name_bytes = self.file_name.encode("utf-8").ljust(FILE_NAME_SIZE, b"\0")
         file_blocks_bytes = self.file_blocks.to_bytes(MAX_FILE_BLOCKS, byteorder="big")
         file_start_block_bytes = self.file_start_block.to_bytes(
@@ -62,7 +83,8 @@ class FileIndexNode:
             MAX_LENGTH_CHILDRENS, byteorder="big"
         )
 
-        id_bytes = self.id.to_bytes(4, byteorder="big")
+        creation_date = self.creation_date.to_bytes(4, byteorder="big")
+        modifaction_date = self.creation_date.to_bytes(4, byteorder="big")
 
         return (
             id_bytes
@@ -71,6 +93,8 @@ class FileIndexNode:
             + file_start_block_bytes
             + is_directory_byte
             + children_count_bytes
+            + creation_date
+            + modifaction_date
         )
 
     @classmethod
@@ -105,15 +129,30 @@ class FileIndexNode:
         ]
         offset_pointer += file_system.config_manager.max_length_childrens
 
+        creation_date_bytes = data[offset_pointer : offset_pointer + 4]
+        offset_pointer += 4
+
+        modification_date_bytes = data[offset_pointer : offset_pointer + 4]
+        offset_pointer += 4
+
         id = int.from_bytes(id_bytes, byteorder="big")
         file_name = file_name_bytes.rstrip(b"\x00").decode("utf-8")
         file_blocks = int.from_bytes(file_blocks_bytes, byteorder="big")
         file_start_block = int.from_bytes(file_start_block_bytes, byteorder="big")
         is_directory = is_directory_byte == b"\1"
         children_count = int.from_bytes(children_count_bytes, byteorder="big")
+        creation_date = int.from_bytes(creation_date_bytes, byteorder="big")
+        modification_date = int.from_bytes(modification_date_bytes, byteorder="big")
 
         instance = cls(
-            file_name, file_start_block, file_blocks, is_directory, children_count, True
+            file_name,
+            file_start_block,
+            file_blocks,
+            is_directory,
+            children_count,
+            True,
+            creation_date,
+            modification_date,
         )
         instance.id = id
         instance.calculate_file_size(file_system.config_manager.block_size)

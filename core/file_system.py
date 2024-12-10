@@ -1,12 +1,13 @@
 import math
 import os
 from typing import List, Optional, Union
-from file_index_node import FileIndexNode
-from index_manager import IndexManager
-from metadata_utility import Metadata, MetadataManager
+from structs.file_index_node import FileIndexNode
+from structs.metadata import Metadata
 from utility import reset_seek_to_zero
-from bitmap_manager import BitmapManager
-from config_manager import ConfigManager
+from managers.index_manager import IndexManager
+from managers.bitmap_manager import BitmapManager
+from managers.config_manager import ConfigManager
+from managers.metadata_manager import MetadataManager
 
 # TODO: ensure no 2 file systems are open for the same file
 # TODO: ensure new code sepeartion works and try to make use of it
@@ -49,25 +50,6 @@ class FileSystem:
 
     def __del__(self):
         self.fs.close()
-
-    @reset_seek_to_zero
-    def load_index(self):
-        hash_table = {}
-        file_location_map = {}
-        for i in range(self.config_manager.max_index_entries):
-            self.fs.seek(
-                self.config_manager.bitmap_size
-                + i * self.config_manager.index_entry_size
-            )
-            data = self.fs.read(self.config_manager.index_entry_size)
-            if data.strip(b"\0") == b"":
-                continue
-
-            file_index = FileIndexNode.from_bytes(data, self)
-            hash_table[file_index.id] = file_index
-            file_location_map[file_index.id] = i
-
-        return hash_table, file_location_map
 
     # TODO: add a method which will also automically copy all the older blocks and expand
     def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:

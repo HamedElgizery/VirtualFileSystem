@@ -37,6 +37,8 @@ class ConfigManager:
             + 1  # Is directory flag
             + self.max_length_children  # Max children size
             + self.file_start_block_index_size  # Start block index for children
+            + 4  # Creation date
+            + 4  # Modification date
         )
 
     def __repr__(self):
