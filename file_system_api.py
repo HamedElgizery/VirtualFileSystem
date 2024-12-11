@@ -1,9 +1,12 @@
+import os
 from typing import Any, Dict, List, Optional
 
 from core.file_system import FileSystem
 from managers.transaction_manager import TransactionManager
 from dataclasses import dataclass
 import datetime
+
+from structs.metadata import Metadata
 
 
 @dataclass(kw_only=True)
@@ -43,8 +46,92 @@ class FileSystemApi:
     This here serves as a handler for all the operations of the file system and should be used when interacting with it.
     """
 
-    def __init__(self, user_id: str):
-        self.file_system = FileSystem(file_system_name=f"{user_id}")
+    FS_PATH = "file_system_disk"
+
+    def __init__(self, user_id: str, file_system: Optional[FileSystem] = None):
+        self.user_id = user_id
+
+        if file_system:
+            self.file_system = file_system
+        else:
+            self.file_system = FileSystem(
+                file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}.disk"
+            )
+        self.current_directory = "/"
+
+    @classmethod
+    def create_new_file_system(
+        cls, user_id: str, metadata: Optional[Dict[str, Any]] = {}
+    ) -> "FileSystemApi":
+        """
+        Creates a new file system and returns an instance of the API.
+
+        :param user_id: The user ID.
+        :param metadata: A dictionary containing the metadata.
+        :return: An instance of the API.
+        """
+        file_system = FileSystem(
+            file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}.disk",
+            specs=Metadata(f"{FileSystemApi.FS_PATH}/{user_id}.disk", **metadata),
+        )
+        return cls(user_id, file_system=file_system)
+
+    """
+    Important Utility Functions.
+    """
+
+    def resolve_path(self, path: str) -> str:
+        """
+        Resolves a given path relative to the current working directory.
+
+        :param path: The path to resolve.
+        :return: An absolute path.
+        """
+        return (
+            os.path.join(self.current_directory, path)
+            if not os.path.isabs(path)
+            else path
+        )
+
+    """
+    Navigation Operations.
+    """
+
+    def change_directory(self, file_path: str) -> None:
+        """
+        Changes the current working directory to the one specified.
+
+        :param file_path: The path of the directory to change to.
+        """
+        resolved_path = self.resolve_path(file_path)
+        if not self.file_system.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_path}' is not a valid directory.")
+
+        self.current_directory = resolved_path
+
+    def is_valid_path(self, file_path: str) -> bool:
+        """
+        Checks if the given path is a valid file or directory.
+
+        :param file_path: The path to check.
+        :return: True if the path is valid, False otherwise.
+        """
+        try:
+            self.file_system.resolve_path(file_path)
+        except Exception:
+            return False
+
+        return True
+
+    def exists(self, file_path: str) -> bool:
+        """
+        Checks if the given path is a valid file or directory.
+
+        :param file_path: The path to check.
+        :return: True if the path is valid, False otherwise.
+        """
+        resolved_path = self.resolve_path(file_path)
+        return self.is_valid_path(resolved_path)
 
     """
     File Operations.
@@ -65,7 +152,9 @@ class FileSystemApi:
         :param file_path: The path where the new file will be created.
         :param file_data: The data to be written to the new file.
         """
-        self.file_system.create_file(file_path, file_data)
+        resolved_path = self.resolve_path(file_path)
+
+        self.file_system.create_file(resolved_path, file_data)
 
     def read_file(self, file_path: str) -> bytes:
         """
@@ -74,7 +163,8 @@ class FileSystemApi:
         :param file_path: The path of the file to be read.
         :return: The contents of the file as bytes.
         """
-        return self.file_system.read_file(file_path)
+        resolved_path = self.resolve_path(file_path)
+        return self.file_system.read_file(resolved_path)
 
     def edit_file(self, file_path: str, new_data: bytes) -> None:
         """
@@ -83,7 +173,8 @@ class FileSystemApi:
         :param file_path: The path of the file to be edited.
         :param new_data: The new data to overwrite the existing file content.
         """
-        self.file_system.edit_file(file_path, new_data)
+        resolved_path = self.resolve_path(file_path)
+        self.file_system.edit_file(resolved_path, new_data)
 
     def delete_file(self, file_path: str) -> None:
         """
@@ -91,7 +182,8 @@ class FileSystemApi:
 
         :param file_path: The path of the file to be deleted.
         """
-        self.file_system.delete_file(file_path)
+        resolved_path = self.resolve_path(file_path)
+        self.file_system.delete_file(resolved_path)
 
     def rename_file(self, file_path: str, new_name: str) -> None:
         """
@@ -100,7 +192,8 @@ class FileSystemApi:
         :param file_path: The current path of the file to be renamed.
         :param new_name: The new name for the file.
         """
-        self.file_system.rename_file(file_path, new_name)
+        resolved_path = self.resolve_path(file_path)
+        self.file_system.rename_file(resolved_path, new_name)
 
     def move_file(self, file_path: str, new_path: str) -> None:
         """
@@ -133,7 +226,8 @@ class FileSystemApi:
         file_metadata = FileMetadata(
             file_name=index_node.file_name,
             file_path=file_path,
-            file_size=self.file_system.config_manager.block_size * index_node.file_size,
+            file_size=self.file_system.config_manager.block_size
+            * index_node.file_blocks,
             is_directory=index_node.is_directory,
             children_count=index_node.children_count,
             creation_date=index_node.creation_date,
@@ -169,7 +263,8 @@ class FileSystemApi:
         :param dir_path: The path of the directory to list contents for.
         :return: A list of the contents of the given directory.
         """
-        files = self.file_system.list_directory_contents(dir_path)
+        resolved_path = self.resolve_path(dir_path)
+        files = self.file_system.list_directory_contents(resolved_path)
         return files
 
     def delete_directory(self, dir_path: str) -> None:

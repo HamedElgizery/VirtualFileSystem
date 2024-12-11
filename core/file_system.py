@@ -1,5 +1,6 @@
 import math
 import os
+import time
 from typing import List, Optional, Tuple, Union
 from structs.file_index_node import FileIndexNode
 from structs.metadata import Metadata
@@ -61,6 +62,24 @@ class FileSystem:
         self.fs.close()
 
     """
+    Utility Functions.
+    """
+
+    def is_directory(self, file_path: str) -> bool:
+        return self.resolve_path(file_path).is_directory
+
+    def exists(self, file_path: str) -> bool:
+        try:
+            self.resolve_path(file_path)
+            return True
+        except:
+            return False
+
+    def update_file_access_time(self, file_path: str) -> None:
+        file_node = self.resolve_path(file_path)
+        self.index_manager.write_to_index(file_node)
+
+    """
     File Operations.
     """
 
@@ -74,6 +93,7 @@ class FileSystem:
         num_blocks_needed = (
             len(file_data) + self.config_manager.block_size - 1
         ) // self.config_manager.block_size
+        num_blocks_needed = max(num_blocks_needed, 1)
         free_blocks = self.bitmap_manager.find_free_space_bitmap(num_blocks_needed)
         file_start_block_index = free_blocks[0]
 
@@ -89,20 +109,7 @@ class FileSystem:
         )
 
         if existing_file:
-            # Free up the blocks used by the existing file in the bitmap
             raise Exception("File already exists.")
-            # self.transaction_manager.add_operation(
-            #     self.bitmap_manager.free_blocks,
-            #     rollback_func=self.bitmap_manager.mark_blocks,
-            #     func_args=[
-            #         range(existing_file.file_blocks),
-            #         existing_file.file_start_block,
-            #     ],
-            #     rollback_args=[
-            #         range(existing_file.file_blocks),
-            #         existing_file.file_start_block,
-            #     ],
-            # )
 
         # Write the new data to free blocks
         current_offset = 0
@@ -192,7 +199,7 @@ class FileSystem:
 
         max_data_size = file_node.file_blocks * self.config_manager.block_size
         if len(new_data) > max_data_size:
-            self.realign(file_node, len(new_data) // max_data_size)
+            self.realign(file_node, len(new_data) // max(max_data_size, 1))
 
         start_position = (
             self.config_manager.bitmap_size
@@ -423,35 +430,58 @@ class FileSystem:
     def resolve_path(
         self, path: str, return_parent: bool = False
     ) -> Union[FileIndexNode, Tuple[FileIndexNode, FileIndexNode]]:
+        """
+        Resolves a given path to the corresponding FileIndexNode(s).
+
+        :param path: The path to resolve.
+        :param return_parent: If True, return both the parent and the target node.
+        :return: The resolved FileIndexNode, or a tuple of (parent_node, target_node) if return_parent is True.
+        """
+        # Normalize and split the path into components
         directories = [d for d in path.split("/") if d not in ("", ".")]
+
+        # Start from the root or current directory based on the path
         current_id = 0 if path.startswith("/") else self.index_manager.index[0].id
         parent_id = 0 if path.startswith("/") else self.index_manager.index[0].id
 
+        # Handle edge case for root path
+        if not directories:  # Path is `/` or equivalent
+            root_node = self.index_manager.index[current_id]
+            return (root_node, root_node) if return_parent else root_node
+
         for i, directory in enumerate(directories):
-
-            if directory == "" or directory == ".":
-                continue
-
-            if len(directories) == 1 and directory == FileSystem.ROOT_DIR:
-                return self.index_manager.index[current_id]
-
-            if i == 0 and directory == FileSystem.ROOT_DIR:
-                continue
-
             if directory == "..":
+                # Move to the parent directory
                 parent_id = current_id
                 parent_dir = self.index_manager.index[current_id]
                 current_id = parent_dir.id
                 continue
 
+            if i == 0 and directory == FileSystem.ROOT_DIR:
+                # Skip root directory marker if it's the first component
+                continue
+
+            # Check if it's the last component
+            is_last_component = i == len(directories) - 1
+
+            # Traverse to the child directory or file
             for child in self.index_manager.index[current_id].load_children(self):
                 if child.file_name == directory:
+                    # Update parent and current IDs
                     parent_id = current_id
                     current_id = child.id
+
+                    # If it's the last component and not a directory, stop traversal
+                    if is_last_component and not child.is_directory:
+                        if return_parent:
+                            return self.index_manager.index[parent_id], child
+                        return child
+
                     break
             else:
-                raise FileNotFoundError(f"File {directory} not found.")
+                raise FileNotFoundError(f"File or directory '{directory}' not found.")
 
+        # Handle return_parent for directories
         if return_parent:
             return (
                 self.index_manager.index[parent_id],
