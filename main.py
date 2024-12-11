@@ -71,6 +71,9 @@ def do_fs_tests():
     fs.create_directory("/root/a/b")
     fs.create_directory("/root/c")
 
+    fs.copy_directory("/root/f", "/root/c/f")
+    dirs = fs.list_directory_contents("/root/c")
+
     dirs = fs.list_directory_contents("/root")
     dirs.sort()
     if dirs[0] != "a" or dirs[1] != "c":

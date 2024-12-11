@@ -3,7 +3,7 @@ import os
 from typing import List, Optional, Tuple, Union
 from structs.file_index_node import FileIndexNode
 from structs.metadata import Metadata
-from utility import reset_seek_to_zero
+from utility import open_file_without_cache, reset_seek_to_zero
 from managers.index_manager import IndexManager
 from managers.bitmap_manager import BitmapManager
 from managers.config_manager import ConfigManager
@@ -11,7 +11,7 @@ from managers.metadata_manager import MetadataManager
 from managers.transaction_manager import TransactionManager
 
 # TODO: ensure no 2 file systems are open for the same file
-# TODO: ensure new code sepeartion works and try to make use of it
+# TODO: ensure nothing can be done to the root directory
 
 
 class FileSystem:
@@ -26,10 +26,14 @@ class FileSystem:
             self.config_manager = ConfigManager(self.metedata_manager.metadata)
 
         if not os.path.exists(self.config_manager.file_system_path):
-            self.fs = open(self.config_manager.file_system_path, "w+b")
+            # self.fs = open(self.config_manager.file_system_path, "w+b")
+            self.fs = open_file_without_cache(
+                self.config_manager.file_system_path, "w+b"
+            )
         else:
-            self.fs = open(self.config_manager.file_system_path, "r+b")
-
+            self.fs = open_file_without_cache(
+                self.config_manager.file_system_path, "r+b"
+            )
         if os.path.getsize(self.config_manager.file_system_path) == 0:
             self.reserve_file()
 
@@ -53,13 +57,16 @@ class FileSystem:
     def __del__(self):
         self.fs.close()
 
+    def shut_down(self):
+        self.fs.close()
+
     """
     File Operations.
     """
 
     def create_file(self, file_dir: str, file_data: bytes):
         directories = [d for d in file_dir.split("/") if d not in ("", ".")]
-        parent_node = self.resolve_path(directories[-2])
+        parent_node = self.resolve_path("/".join(directories[:-1]))
         # parent_node = self.get_file_by_name(parent_dir)
         if not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
@@ -333,19 +340,22 @@ class FileSystem:
 
         self.transaction_manager.commit()
 
-    def move_directory(self, dir_path: str, new_dir_path: str) -> None:
-        parent_node, dir_node = self.resolve_path(dir_path, True)
-        new_parent_node, new_dir_node = self.resolve_path(new_dir_path, True)
+    def copy_directory(self, dir_path: str, new_dir_path: str) -> None:
+        dir_node = self.resolve_path(dir_path)
 
         if not dir_node:
             raise ValueError("Directory doesn't exist")
+
         if not dir_node.is_directory:
             raise ValueError("Not a directory")
 
-        self.transaction_manager.add_operation(
-            parent_node.remove_child,
-            rollback_func=parent_node.add_child,
-        )
+        children = dir_node.load_children(self)
+
+        self.create_directory(new_dir_path)
+        for child in children:
+            self.copy_file(
+                f"{dir_path}/{child.file_name}", f"{new_dir_path}/{child.file_name}"
+            )
 
     # TODO: add a method which will also automically copy all the older blocks and expand
     def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:

@@ -1,12 +1,12 @@
 from typing import Any, Dict, List, Optional
 
 from core.file_system import FileSystem
-from transaction_manager import TransactionManager
+from managers.transaction_manager import TransactionManager
 from dataclasses import dataclass
 import datetime
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FileMetadata:
     file_name: str
     file_path: str
@@ -28,13 +28,23 @@ class FileMetadata:
             )
 
 
+# @dataclass(kw_only=True)
+# class FolderMetadata(FileMetadata):
+#     children_count: int
+
+#     def __post_init__(self):
+#         super().__post_init__()
+#         if not isinstance(self.children_count, int):
+#             raise ValueError("children_count should be an integer")
+
+
 class FileSystemApi:
     """
     This here serves as a handler for all the operations of the file system and should be used when interacting with it.
     """
 
     def __init__(self, user_id: str):
-        self.file_system = FileSystem(file_system_name=f"{user_id}_fs")
+        self.file_system = FileSystem(file_system_name=f"{user_id}")
 
     """
     File Operations.
@@ -122,8 +132,8 @@ class FileSystemApi:
         index_node = self.file_system.index_manager.find_file_by_name(file_path)
         file_metadata = FileMetadata(
             file_name=index_node.file_name,
-            file_path=index_node.file_path,
-            file_size=index_node.file_size,
+            file_path=file_path,
+            file_size=self.file_system.config_manager.block_size * index_node.file_size,
             is_directory=index_node.is_directory,
             children_count=index_node.children_count,
             creation_date=index_node.creation_date,
@@ -195,16 +205,26 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be copied.
         :param copy_path: The path where the directory will be copied to.
         """
-        pass
+        self.file_system.copy_directory(dir_path, copy_path)
 
-    def get_directory_metadata(self, dir_path: str) -> Dict[str, Any]:
+    def get_directory_metadata(self, dir_path: str) -> "FileMetadata":
         """
         Returns a dictionary containing metadata for the given directory.
 
         :param dir_path: The path of the directory to retrieve metadata for.
         :return: A dictionary containing directory metadata.
         """
-        pass
+        index_node = self.file_system.index_manager.find_file_by_name(dir_path)
+        folder_metadata = FileMetadata(
+            file_name=index_node.file_name,
+            file_path=dir_path,
+            file_size=self.file_system.config_manager.block_size * index_node.file_size,
+            is_directory=index_node.is_directory,
+            children_count=index_node.children_count,
+            creation_date=index_node.creation_date,
+            modification_date=index_node.modification_date,
+        )
+        return folder_metadata
 
     def get_directory_size(self, dir_path: str) -> int:
         """
@@ -213,7 +233,7 @@ class FileSystemApi:
         :param dir_path: The path of the directory to retrieve size for.
         :return: The total size of the directory in bytes.
         """
-        pass
+        return self.file_system.get_file_size(dir_path)
 
     """
     Other Operations.
