@@ -79,6 +79,69 @@ class FileSystem:
         file_node = self.resolve_path(file_path)
         self.index_manager.write_to_index(file_node)
 
+    def resolve_path(
+        self, path: str, return_parent: bool = False
+    ) -> Union[FileIndexNode, Tuple[FileIndexNode, FileIndexNode]]:
+        """
+        Resolves a given path to the corresponding FileIndexNode(s).
+
+        :param path: The path to resolve.
+        :param return_parent: If True, return both the parent and the target node.
+        :return: The resolved FileIndexNode, or a tuple of (parent_node, target_node) if return_parent is True.
+        """
+        # Normalize and split the path into components
+        directories = [d for d in path.split("/") if d not in ("", ".")]
+
+        # Start from the root or current directory based on the path
+        current_id = 0 if path.startswith("/") else self.index_manager.index[0].id
+        parent_id = 0 if path.startswith("/") else self.index_manager.index[0].id
+
+        # Handle edge case for root path
+        if not directories:  # Path is `/` or equivalent
+            root_node = self.index_manager.index[current_id]
+            return (root_node, root_node) if return_parent else root_node
+
+        for i, directory in enumerate(directories):
+            if directory == "..":
+                # Move to the parent directory
+                parent_id = current_id
+                parent_dir = self.index_manager.index[current_id]
+                current_id = parent_dir.id
+                continue
+
+            if i == 0 and directory == FileSystem.ROOT_DIR:
+                # Skip root directory marker if it's the first component
+                continue
+
+            # Check if it's the last component
+            is_last_component = i == len(directories) - 1
+
+            # Traverse to the child directory or file
+            for child in self.index_manager.index[current_id].load_children(self):
+                if child.file_name == directory:
+                    # Update parent and current IDs
+                    parent_id = current_id
+                    current_id = child.id
+
+                    # If it's the last component and not a directory, stop traversal
+                    if is_last_component and not child.is_directory:
+                        if return_parent:
+                            return self.index_manager.index[parent_id], child
+                        return child
+
+                    break
+            else:
+                raise FileNotFoundError(f"File or directory '{directory}' not found.")
+
+        # Handle return_parent for directories
+        if return_parent:
+            return (
+                self.index_manager.index[parent_id],
+                self.index_manager.index[current_id],
+            )
+
+        return self.index_manager.index[current_id]
+
     """
     File Operations.
     """
@@ -163,6 +226,7 @@ class FileSystem:
 
         self.transaction_manager.commit()
 
+    # TODO: i need to centralize this shit i dont want some to work like this and some to work like that but oh well
     def read_file(self, file_dir: Union[str, FileIndexNode]) -> bytes:
         if isinstance(file_dir, str):
             file_node = self.resolve_path(file_dir)
@@ -308,6 +372,9 @@ class FileSystem:
         return [child.file_name for child in children]
 
     def delete_directory(self, dir_path: str) -> None:
+
+        local_transcation_manager = TransactionManager()
+
         parent_node, dir_node = self.resolve_path(dir_path, True)
         children = dir_node.load_children(self)
 
@@ -316,43 +383,52 @@ class FileSystem:
         if not dir_node.is_directory:
             raise ValueError("Not a directory")
 
-        self.transaction_manager.add_operation(
+        local_transcation_manager.add_operation(
             self.bitmap_manager.free_blocks,
-            rollback_func=self.bitmap_manager.mark_used,
+            rollback_func=self.bitmap_manager.mark_blocks,
             func_args=[range(dir_node.file_blocks), dir_node.file_start_block],
             rollback_args=[range(dir_node.file_blocks), dir_node.file_start_block],
         )
 
         for child in children:
-            self.transaction_manager.add_operation(
+            if child.is_directory:
+                local_transcation_manager.add_operation(
+                    self.delete_directory,
+                    rollback_func=None,
+                    func_args=[dir_path + "/" + child.file_name],
+                    rollback_args=[],
+                )
+                continue
+
+            local_transcation_manager.add_operation(
                 self.bitmap_manager.free_blocks,
-                rollback_func=self.bitmap_manager.mark_used,
+                rollback_func=self.bitmap_manager.mark_blocks,
                 func_args=[range(child.file_blocks), child.file_start_block],
                 rollback_args=[range(child.file_blocks), child.file_start_block],
             )
 
-            self.transaction_manager.add_operation(
+            local_transcation_manager.add_operation(
                 self.index_manager.delete_from_index,
                 rollback_func=self.index_manager.write_to_index,
                 func_args=[child],
                 rollback_args=[child],
             )
 
-        self.transaction_manager.add_operation(
+        local_transcation_manager.add_operation(
             parent_node.remove_child,
             rollback_func=parent_node.add_child,
             func_args=[self, parent_node.file_name],
             rollback_args=[self, parent_node],
         )
 
-        self.transaction_manager.add_operation(
+        local_transcation_manager.add_operation(
             self.index_manager.delete_from_index,
             rollback_func=self.index_manager.write_to_index,
             func_args=[dir_node],
             rollback_args=[dir_node],
         )
 
-        self.transaction_manager.commit()
+        local_transcation_manager.commit()
 
     def copy_directory(self, dir_path: str, new_dir_path: str) -> None:
         dir_node = self.resolve_path(dir_path)
@@ -426,7 +502,6 @@ class FileSystem:
             for block in free_blocks:
                 self.bitmap_manager.mark_used(block)
 
-    @reset_seek_to_zero
     def reserve_file(self) -> None:
         self.fs.seek(
             self.config_manager.bitmap_size
@@ -436,76 +511,8 @@ class FileSystem:
         )
         self.fs.write(b"\0")
 
-    # adddED edit file
-
-    def resolve_path(
-        self, path: str, return_parent: bool = False
-    ) -> Union[FileIndexNode, Tuple[FileIndexNode, FileIndexNode]]:
-        """
-        Resolves a given path to the corresponding FileIndexNode(s).
-
-        :param path: The path to resolve.
-        :param return_parent: If True, return both the parent and the target node.
-        :return: The resolved FileIndexNode, or a tuple of (parent_node, target_node) if return_parent is True.
-        """
-        # Normalize and split the path into components
-        directories = [d for d in path.split("/") if d not in ("", ".")]
-
-        # Start from the root or current directory based on the path
-        current_id = 0 if path.startswith("/") else self.index_manager.index[0].id
-        parent_id = 0 if path.startswith("/") else self.index_manager.index[0].id
-
-        # Handle edge case for root path
-        if not directories:  # Path is `/` or equivalent
-            root_node = self.index_manager.index[current_id]
-            return (root_node, root_node) if return_parent else root_node
-
-        for i, directory in enumerate(directories):
-            if directory == "..":
-                # Move to the parent directory
-                parent_id = current_id
-                parent_dir = self.index_manager.index[current_id]
-                current_id = parent_dir.id
-                continue
-
-            if i == 0 and directory == FileSystem.ROOT_DIR:
-                # Skip root directory marker if it's the first component
-                continue
-
-            # Check if it's the last component
-            is_last_component = i == len(directories) - 1
-
-            # Traverse to the child directory or file
-            for child in self.index_manager.index[current_id].load_children(self):
-                if child.file_name == directory:
-                    # Update parent and current IDs
-                    parent_id = current_id
-                    current_id = child.id
-
-                    # If it's the last component and not a directory, stop traversal
-                    if is_last_component and not child.is_directory:
-                        if return_parent:
-                            return self.index_manager.index[parent_id], child
-                        return child
-
-                    break
-            else:
-                raise FileNotFoundError(f"File or directory '{directory}' not found.")
-
-        # Handle return_parent for directories
-        if return_parent:
-            return (
-                self.index_manager.index[parent_id],
-                self.index_manager.index[current_id],
-            )
-
-        return self.index_manager.index[current_id]
-
-    @reset_seek_to_zero
     def list_all_files(self) -> List[FileIndexNode]:
         return list(self.index_manager.index.values())
-
-    # TODO: i need to centralize this shit i dont want some to work like this and some to work like that but oh well
 
     def get_file_size(self, file_dir: str) -> int:
         file_node = self.resolve_path(file_dir)
