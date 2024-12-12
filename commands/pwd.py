@@ -1,11 +1,11 @@
+"""Simulates the behavior of the 'pwd' command to print the current working directory."""
+
 import os
 from typing import TYPE_CHECKING, List
 
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
-
-"""Simulates the behavior of the 'pwd' command to print the current working directory."""
 
 
 def execute(args: List[str], fs: "FileSystemApi"):

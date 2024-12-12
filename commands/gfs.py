@@ -1,11 +1,3 @@
-from typing import TYPE_CHECKING, List
-
-from file_system_api import FileSystemApi
-
-
-if TYPE_CHECKING:
-    from file_system_api import FileSystemApi
-
 """Retrieves the size of a file in bytes.
 
 Args:
@@ -15,6 +7,14 @@ Args:
 Returns:
     str: The size of the file in bytes.
 """
+
+from typing import TYPE_CHECKING, List
+
+from file_system_api import FileSystemApi
+
+
+if TYPE_CHECKING:
+    from file_system_api import FileSystemApi
 
 
 def execute(args: List[str], fs: FileSystemApi):

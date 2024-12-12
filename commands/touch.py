@@ -1,3 +1,11 @@
+"""
+Simulates the behavior of the 'touch' command to create a new file or update a file's last modified time.
+
+Usage:
+  touch <file_name>
+
+"""
+
 import os
 import time
 from typing import TYPE_CHECKING, List

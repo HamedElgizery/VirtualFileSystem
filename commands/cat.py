@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from core.file_system import FileSystem
+    from file_system_api import FileSystemApi
 
 
 """
@@ -12,7 +12,7 @@ Usage:
 """
 
 
-def execute(args: List, fs: "FileSystem"):
+def execute(args: List, fs: "FileSystemApi"):
     """
     Prints the contents of a file to the console.
 

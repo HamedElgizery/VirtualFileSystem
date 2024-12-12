@@ -1,15 +1,14 @@
-from typing import TYPE_CHECKING, List
-
-if TYPE_CHECKING:
-    from file_system_api import FileSystemApi
-
-
 """Renames a file.
 
 Args:
     args (List[str]): The list of arguments to be passed to the command.
     fs (FileSystemApi): The file system to use.
 """
+
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from file_system_api import FileSystemApi
 
 
 def execute(args: List[str], fs: "FileSystemApi") -> None:

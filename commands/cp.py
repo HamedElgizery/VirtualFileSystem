@@ -1,15 +1,15 @@
-import os
-from typing import TYPE_CHECKING, List
-
-if TYPE_CHECKING:
-    from file_system_api import FileSystemApi
-
 """Simulates the behavior of the 'cp' command to copy a file.
 
 Args:
     args (List[str]): The command line arguments.
     fs (FileSystemApi): The file system.
 """
+
+import os
+from typing import TYPE_CHECKING, List
+
+if TYPE_CHECKING:
+    from file_system_api import FileSystemApi
 
 
 def execute(args: List[str], fs: "FileSystemApi"):

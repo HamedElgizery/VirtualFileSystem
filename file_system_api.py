@@ -213,6 +213,9 @@ class FileSystemApi:
         :param file_path: The path of the file to be read.
         :return: The contents of the file as bytes.
         """
+        if self.is_directory(file_path):
+            raise ValueError(f"The path '{file_path}' is a directory.")
+
         resolved_path = self.resolve_path(file_path)
         data = self.file_system.read_file(resolved_path)
         self.logger.info(f"Read {resolved_path} with data of length {len(data)}")
@@ -225,6 +228,9 @@ class FileSystemApi:
         :param file_path: The path of the file to be edited.
         :param new_data: The new data to overwrite the existing file content.
         """
+        if self.is_directory(file_path):
+            raise ValueError(f"The path '{file_path}' is a directory.")
+
         resolved_path = self.resolve_path(file_path)
         self.file_system.edit_file(resolved_path, new_data)
         self.logger.info(
@@ -237,6 +243,9 @@ class FileSystemApi:
 
         :param file_path: The path of the file to be deleted.
         """
+        if self.is_directory(file_path):
+            raise ValueError(f"The path '{file_path}' is a directory.")
+
         resolved_path = self.resolve_path(file_path)
         self.file_system.delete_file(resolved_path)
         self.logger.info(f"Deleted {resolved_path}")

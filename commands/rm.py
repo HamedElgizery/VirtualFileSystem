@@ -1,15 +1,14 @@
-from typing import List, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from file_system_api import FileSystemApi
-
-
 """
 Simulates the behavior of the 'rm' command to delete a file or a folder.
 
 Args:
     args (list): The arguments passed to the command.
 """
+
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from file_system_api import FileSystemApi
 
 
 def execute(args: List, fs: "FileSystemApi"):

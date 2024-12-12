@@ -1,3 +1,10 @@
+"""Simulates the behavior of the 'mkdir' command to create a directory or edit an existing one.
+
+Args:
+    arg (str): The name or path of the directory to create.
+    edit_dir (str, optional): New name or path to rename or move the directory.
+"""
+
 import os
 import shutil
 from typing import TYPE_CHECKING, List
@@ -5,13 +12,6 @@ from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
-
-"""Simulates the behavior of the 'mkdir' command to create a directory or edit an existing one.
-
-Args:
-    arg (str): The name or path of the directory to create.
-    edit_dir (str, optional): New name or path to rename or move the directory.
-"""
 
 
 def execute(args: List, fs: "FileSystemApi" = None):

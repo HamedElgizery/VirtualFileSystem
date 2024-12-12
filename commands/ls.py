@@ -1,3 +1,10 @@
+"""
+Lists the contents of the current directory.
+
+:param fs: The file system.
+:param args: The command line arguments.
+"""
+
 import os
 from typing import TYPE_CHECKING
 
@@ -9,12 +16,6 @@ def execute(
     args: list,
     fs: "FileSystemApi",
 ):
-    """
-    Lists the contents of the current directory.
-
-    :param fs: The file system.
-    :param args: The command line arguments.
-    """
     if len(args) > 1:
         print("Error: too many arguments for ls command")
         return

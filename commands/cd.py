@@ -1,8 +1,3 @@
-import os
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from file_system_api import FileSystemApi
 """
 Simulates the behavior of the 'cd' command, with support for home directory fallback.
 
@@ -13,6 +8,12 @@ Behavior:
     - If `args` is empty, defaults to the user's home directory.
     - Prints meaningful messages for successful changes or errors.
 """
+
+import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from file_system_api import FileSystemApi
 
 
 def execute(args: list, fs: "FileSystemApi"):
