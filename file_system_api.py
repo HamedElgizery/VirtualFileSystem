@@ -80,6 +80,15 @@ class FileSystemApi:
     Important Utility Functions.
     """
 
+    def normalize_path(self, path):
+        """Normalize the path and replace the separator with '/'.
+
+        :param path: The path to normalize.
+        :return: A normalized path.
+        """
+        # Replace the separator with '/' and normalize the path
+        return os.path.join(self.current_directory, path).replace(os.sep, "/")
+
     def resolve_path(self, path: str) -> str:
         """
         Resolves a given path relative to the current working directory.
@@ -87,10 +96,15 @@ class FileSystemApi:
         :param path: The path to resolve.
         :return: An absolute path.
         """
-        return (
-            os.path.join(self.current_directory, path)
-            if not os.path.isabs(path)
-            else path
+        if path == "":
+            return self.current_directory
+
+        return self.normalize_path(
+            (
+                os.path.join(self.current_directory, path)
+                if not os.path.isabs(path)
+                else path
+            )
         )
 
     """
@@ -123,6 +137,16 @@ class FileSystemApi:
 
         return True
 
+    def is_directory(self, file_path: str) -> bool:
+        """
+        Checks if the given path is a directory.
+
+        :param file_path: The path to check.
+        :return: True if the path is a directory, False otherwise.
+        """
+        resolved_path = self.resolve_path(file_path)
+        return self.file_system.is_directory(resolved_path)
+
     def exists(self, file_path: str) -> bool:
         """
         Checks if the given path is a valid file or directory.
@@ -143,7 +167,8 @@ class FileSystemApi:
 
         :param file_path: The path where the new empty file will be created.
         """
-        self.file_system.create_file(file_path, b"")
+        resolved_path = self.resolve_path(file_path)
+        self.file_system.create_file(resolved_path, b"")
 
     def create_file(self, file_path: str, file_data: bytes) -> None:
         """
@@ -153,7 +178,6 @@ class FileSystemApi:
         :param file_data: The data to be written to the new file.
         """
         resolved_path = self.resolve_path(file_path)
-
         self.file_system.create_file(resolved_path, file_data)
 
     def read_file(self, file_path: str) -> bytes:
@@ -254,7 +278,8 @@ class FileSystemApi:
 
         :param dir_path: The path of the new directory to create.
         """
-        self.file_system.create_directory(dir_path)
+        resolved_path = self.resolve_path(dir_path)
+        self.file_system.create_directory(resolved_path)
 
     def list_directory_contents(self, dir_path: str) -> List[str]:
         """
@@ -273,7 +298,8 @@ class FileSystemApi:
 
         :param dir_path: The path of the directory to delete.
         """
-        self.file_system.delete_directory(dir_path)
+        resolved_path = self.resolve_path(dir_path)
+        self.file_system.delete_directory(resolved_path)
 
     def rename_directory(self, dir_path: str, new_name: str) -> None:
         """

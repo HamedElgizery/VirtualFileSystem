@@ -30,11 +30,11 @@ def open_file_without_cache(filepath, mode):
 
     flags = mode_flags[mode]
 
-    if os.name == "nt":  # Windows
+    if os.name == "nt":
         flags |= os.O_BINARY
-    else:  # POSIX (Linux, macOS, etc.)
+    else:
         flags |= os.O_SYNC
 
     fd = os.open(filepath, flags)
 
-    return os.fdopen(fd, mode)
+    return os.fdopen(fd, mode, buffering=0)

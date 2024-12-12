@@ -53,6 +53,10 @@ class ModularShell(cmd.Cmd):
         def wrapper(args):
             # Pass the FileSystemApi instance to each command
             func(args.split(" "), self.file_system_api)
+            if self.file_system_api.current_directory != "/":
+                ModularShell.prompt = (
+                    f"(yoyo) {self.file_system_api.current_directory}>> "
+                )
 
         setattr(self, f"do_{name}", wrapper)
 

@@ -12,6 +12,8 @@ from core.file_system import FileSystem
 # TODO: optional add jornaling support and crash recovery
 # TODO: optional consider a way to not load entire index into memory and split parts of it (very optional not important at all even)
 
+# TODO: basically make sure delete directory works
+
 
 def file_creation_test(fs: FileSystem):
     # Test: Write and overwrite a file

@@ -245,7 +245,7 @@ class FileSystem:
     def create_directory(self, dir_name: str):
         # parent_node = self.get_file_by_name(parent_dir_name)
         directories = [d for d in dir_name.split("/") if d not in ("", ".")]
-        parent_node = self.resolve_path(directories[-2])
+        parent_node = self.resolve_path("/".join(directories[:-1]) or "/")
         if not parent_node or not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
         children = parent_node.load_children(self)

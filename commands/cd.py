@@ -2,32 +2,35 @@ import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.file_system import FileSystem
+    from file_system_api import FileSystemApi
+"""
+Simulates the behavior of the 'cd' command, with support for home directory fallback.
+
+Args:
+    args (list): The arguments passed to the command.
+
+Behavior:
+    - If `args` is empty, defaults to the user's home directory.
+    - Prints meaningful messages for successful changes or errors.
+"""
 
 
-def cd(args: list, fs: "FileSystem"):
-    """
-    Simulates the behavior of the 'cd' command, with support for home directory fallback.
+def execute(args: list, fs: "FileSystemApi"):
 
-    Args:
-        args (list): The arguments passed to the command.
-
-    Behavior:
-        - If `args` is empty, defaults to the user's home directory.
-        - Prints meaningful messages for successful changes or errors.
-    """
     # Default to the user's home directory if no path is provided
     if not args:
-        path = "~"  # Get the user's home directory
+        path = fs.current_directory
     else:
         path = args[0]
 
-    try:
-        # Attempt to change the current working directory
-        fs.change_directory(path)
-        print(f"Directory successfully changed to: {fs.current_directory}")
-    except FileNotFoundError:
+    resolved_path = fs.resolve_path(path)
+    if not fs.is_valid_path(resolved_path):
         print(f"Error: Directory '{path}' does not exist.")
+        return
+
+    try:
+        fs.change_directory(resolved_path)
+        print(f"Directory successfully changed to: {fs.current_directory}")
     except NotADirectoryError:
         print(f"Error: '{path}' is not a directory.")
     except PermissionError:

@@ -19,7 +19,7 @@ def execute(
         print("Error: too many arguments for ls command")
         return
 
-    current_dir = fs.current_directory
+    current_dir = args[0] if args else ""
     if args and args[0] == "-l":
         files = fs.list_directory_contents(current_dir)
         for file in files:
