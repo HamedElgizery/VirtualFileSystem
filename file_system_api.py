@@ -334,7 +334,8 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be renamed.
         :param new_name: The new name for the directory.
         """
-        self.file_system.rename_file(dir_path, new_name)
+        resolved_path = self.resolve_path(dir_path)
+        self.file_system.rename_file(resolved_path, new_name)
 
     def move_directory(self, dir_path: str, new_path: str) -> None:
         """
@@ -352,7 +353,14 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be copied.
         :param copy_path: The path where the directory will be copied to.
         """
-        self.file_system.copy_directory(dir_path, copy_path)
+        resolved_path = self.resolve_path(dir_path)
+        resolved_output_path = self.resolve_path(copy_path)
+
+        resolved_output_path = self.normalize_path(
+            os.path.join(resolved_output_path, os.path.basename(dir_path))
+        )
+
+        self.file_system.copy_directory(resolved_path, resolved_output_path)
 
     def get_directory_metadata(self, dir_path: str) -> "FileMetadata":
         """
@@ -380,7 +388,8 @@ class FileSystemApi:
         :param dir_path: The path of the directory to retrieve size for.
         :return: The total size of the directory in bytes.
         """
-        return self.file_system.get_file_size(dir_path)
+        resolved_path = self.resolve_path(dir_path)
+        return self.file_system.get_file_size(resolved_path)
 
     """
     Other Operations.
@@ -392,8 +401,8 @@ class FileSystemApi:
     def get_free_space(self):
         pass
 
-    def get_fragementation_precentage(self):
-        pass
+    def get_fragementation_precentage(self) -> float:
+        return self.get_fragementation_precentage()
 
     def defragmentation(self):
         pass

@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
 
+"""Simulates the behavior of the 'pwd' command to print the current working directory."""
+
 
 def execute(args: List[str], fs: "FileSystemApi"):
-    """Simulates the behavior of the 'pwd' command to print the current working directory."""
 
     # Check if any argument is passed (though pwd typically doesn't take any argument)
     if args:
