@@ -92,22 +92,34 @@ class FileSystemApi:
     def resolve_path(self, path: str) -> str:
         """
         Resolves a given path relative to the current working directory.
+        Handles special cases like ., .., /., ./, and multiple slashes (e.g., ////).
 
         :param path: The path to resolve.
-        :return: An absolute path.
+        :return: An absolute, normalized path.
         """
-        if path == "..":
-            return os.path.dirname(self.current_directory)
-        elif path == "":
+        if path in ["", ".", "./"]:
+            # Current directory
             return self.current_directory
+        elif path == "..":
+            # Parent directory
+            return os.path.dirname(self.current_directory)
+        elif path.startswith("./"):
+            # Strip the leading ./ and resolve relative to the current directory
+            path = path[2:]
+        elif path.startswith("/."):
+            # Normalize /. and resolve as an absolute path
+            path = "/" + path[2:]
+        elif path.startswith("//"):
+            # Simplify multiple leading slashes
+            path = "/" + path.lstrip("/")
 
-        return self.normalize_path(
-            (
-                os.path.join(self.current_directory, path)
-                if not os.path.isabs(path)
-                else path
-            )
+        # Normalize the combined path
+        resolved_path = (
+            os.path.join(self.current_directory, path)
+            if not os.path.isabs(path)
+            else path
         )
+        return self.normalize_path(os.path.normpath(resolved_path))
 
     """
     Navigation Operations.
