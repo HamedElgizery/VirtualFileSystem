@@ -236,6 +236,13 @@ class FileSystem:
             rollback_args=[file_node],
         )
 
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+
         self.transaction_manager.commit()
 
     """
@@ -363,6 +370,10 @@ class FileSystem:
             self.copy_file(
                 f"{dir_path}/{child.file_name}", f"{new_dir_path}/{child.file_name}"
             )
+
+    """
+    Other Operations.
+    """
 
     # TODO: add a method which will also automically copy all the older blocks and expand
     def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
