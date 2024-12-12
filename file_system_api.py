@@ -266,7 +266,12 @@ class FileSystemApi:
         :param file_path: The path of the file to retrieve size for.
         :return: The size of the file in bytes.
         """
-        return self.file_system.get_file_size(file_path)
+        resolved_path = self.resolve_path(file_path)
+
+        if self.is_directory(file_path):
+            raise ValueError("Cannot get size of a directory.")
+
+        return self.file_system.get_file_size(resolved_path)
 
     """
     Directory Operations.

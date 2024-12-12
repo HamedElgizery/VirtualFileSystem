@@ -252,6 +252,7 @@ class FileSystem:
 
         return b"".join(data).rstrip(b"\x00")
 
+    # TODO: add transcation manager here
     def edit_file(self, file_dir: str, new_data: bytes):
 
         file_node = self.resolve_path(file_dir)
@@ -262,8 +263,11 @@ class FileSystem:
             raise ValueError("The specified path is a directory.")
 
         max_data_size = file_node.file_blocks * self.config_manager.block_size
-        if len(new_data) > max_data_size:
-            self.realign(file_node, math.ceil(len(new_data) // max_data_size))
+        new_data_blocks = len(new_data) // self.config_manager.block_size
+
+        factor = math.ceil(new_data_blocks / file_node.file_blocks)
+        if factor >= 2:
+            self.realign(file_node, factor)
 
         start_position = (
             self.config_manager.bitmap_size

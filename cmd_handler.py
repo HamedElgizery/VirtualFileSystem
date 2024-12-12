@@ -8,6 +8,7 @@ import cmd
 import os
 import importlib
 import glob
+from typing import List
 
 from file_system_api import FileSystemApi
 
@@ -49,13 +50,31 @@ class ModularShell(cmd.Cmd):
             if command_func:
                 self.add_command(module_name, command_func)
 
+    def parse_args(self, args: str) -> List[str]:
+        args_list = []
+        current_arg = ""
+        in_quotes = False
+        for char in args:
+            if char == '"':
+                in_quotes = not in_quotes
+            elif char == " " and not in_quotes:
+                if current_arg:
+                    args_list.append(current_arg)
+                    current_arg = ""
+            else:
+                current_arg += char
+        if current_arg:
+            args_list.append(current_arg)
+
+        return args_list
+
     def add_command(self, name, func):
         def wrapper(args):
             # Pass the FileSystemApi instance to each command
             try:
-                func(args.split(" "), self.file_system_api)
+                func(self.parse_args(args), self.file_system_api)
             except Exception as e:
-                print(e)
+                print(f"An Error Occured: {e}")
             finally:
                 if self.file_system_api.current_directory != "/":
                     ModularShell.prompt = (
