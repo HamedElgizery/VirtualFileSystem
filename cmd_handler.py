@@ -54,8 +54,8 @@ class ModularShell(cmd.Cmd):
             # Pass the FileSystemApi instance to each command
             try:
                 func(args.split(" "), self.file_system_api)
-            except:
-                pass
+            except Exception as e:
+                print(e)
             finally:
                 if self.file_system_api.current_directory != "/":
                     ModularShell.prompt = (

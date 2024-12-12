@@ -28,19 +28,21 @@ def execute(args: list, fs: "FileSystemApi"):
             return
 
         # Resolve the file path
-        resolved_path = fs.resolve_path(file_path)
 
         # Write or append to the file
         if mode == "overwrite":
-            fs.edit_file(resolved_path, message.encode())
+            if not fs.exists(file_path):
+                fs.create_file(file_path, message.encode())
+            else:
+                fs.edit_file(file_path, message.encode())
 
         elif mode == "append":
-            existing_data = fs.read_file(resolved_path)
+            existing_data = fs.read_file(file_path)
             updated_data = existing_data + message.encode()
-            fs.edit_file(resolved_path, updated_data)
+            fs.edit_file(file_path, updated_data)
 
         print(
-            f"Message {'written to' if mode == 'overwrite' else 'appended to'} '{resolved_path}'."
+            f"Message {'written to' if mode == 'overwrite' else 'appended to'} '{file_path}'."
         )
 
     except Exception as e:

@@ -263,7 +263,7 @@ class FileSystem:
 
         max_data_size = file_node.file_blocks * self.config_manager.block_size
         if len(new_data) > max_data_size:
-            self.realign(file_node, len(new_data) // max(max_data_size, 1))
+            self.realign(file_node, math.ceil(len(new_data) // max_data_size))
 
         start_position = (
             self.config_manager.bitmap_size
