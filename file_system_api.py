@@ -96,7 +96,9 @@ class FileSystemApi:
         :param path: The path to resolve.
         :return: An absolute path.
         """
-        if path == "":
+        if path == "..":
+            return os.path.dirname(self.current_directory)
+        elif path == "":
             return self.current_directory
 
         return self.normalize_path(
@@ -235,7 +237,14 @@ class FileSystemApi:
         :param file_path: The current path of the file to be copied.
         :param copy_path: The path where the file will be copied to.
         """
-        self.file_system.copy_file(file_path, copy_path)
+        resolved_path = self.resolve_path(file_path)
+        resolved_output_path = self.resolve_path(copy_path)
+
+        resolved_output_path = self.normalize_path(
+            os.path.join(resolved_output_path, os.path.basename(file_path))
+        )
+
+        self.file_system.copy_file(resolved_path, resolved_output_path)
 
     # Will create a simple metadata for each file with timecreated, modification date file size etc
 

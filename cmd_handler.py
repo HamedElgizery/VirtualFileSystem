@@ -76,10 +76,11 @@ class ModularShell(cmd.Cmd):
             except Exception as e:
                 print(f"An Error Occured: {e}")
             finally:
-                if self.file_system_api.current_directory != "/":
-                    ModularShell.prompt = (
-                        f"(yoyo) {self.file_system_api.current_directory}>> "
-                    )
+                ModularShell.prompt = (
+                    f"(yoyo) {self.file_system_api.current_directory}>> "
+                )
+                if self.file_system_api.current_directory == "/":
+                    ModularShell.prompt = f"(yoyo) >> "
 
         setattr(self, f"do_{name}", wrapper)
 
