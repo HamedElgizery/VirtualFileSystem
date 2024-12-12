@@ -11,6 +11,7 @@ import glob
 from typing import List
 
 from file_system_api import FileSystemApi
+from utility import setup_logger
 
 
 class ModularShell(cmd.Cmd):
@@ -19,6 +20,9 @@ class ModularShell(cmd.Cmd):
 
     def __init__(self, user_id):
         super().__init__()
+        self.log_path = f"logs/{user_id}"
+        self.user_id = user_id
+        self.logger = setup_logger(self.log_path, user_id)
         self.modules = {}
         self.modules_help = {}
 
@@ -84,14 +88,21 @@ class ModularShell(cmd.Cmd):
 
         setattr(self, f"do_{name}", wrapper)
 
-        def help_wrapper():
-            print(self.modules_help.get(name, "No help available for this command."))
-
-        setattr(self, f"help_{name}", help_wrapper)
-
     def do_exit(self, arg):
         print("BIBI GO BYEBYE!")
         return True
+
+    def do_help(self, arg):
+        if not arg:
+            # Default help behavior - list all commands
+            commands = [name[3:] for name in dir(self) if name.startswith("do_")]
+            commands += self.modules.keys()
+            commands = set(commands)
+            print("Available commands:")
+            for command in commands:
+                print(f"  {command}")
+        else:
+            print(self.modules_help.get(arg, "No help available for this command."))
 
 
 if __name__ == "__main__":

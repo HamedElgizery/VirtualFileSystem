@@ -1,3 +1,4 @@
+import logging
 import math
 import os
 import time
@@ -18,7 +19,15 @@ from managers.transaction_manager import TransactionManager
 class FileSystem:
     ROOT_DIR = "root"
 
-    def __init__(self, file_system_name: str, specs: Optional[Metadata] = None) -> None:
+    def __init__(
+        self,
+        file_system_name: str,
+        user_id: str,
+        specs: Optional[Metadata] = None,
+    ) -> None:
+        self.user_id = user_id
+        self.logger = logging.getLogger(self.user_id)
+
         if specs:
             self.metedata_manager = MetadataManager(file_system_name, specs)
             self.config_manager = ConfigManager(specs)
@@ -26,20 +35,19 @@ class FileSystem:
             self.metedata_manager = MetadataManager(file_system_name)
             self.config_manager = ConfigManager(self.metedata_manager.metadata)
 
-        if not os.path.exists(self.config_manager.file_system_path):
-            # self.fs = open(self.config_manager.file_system_path, "w+b")
-            self.fs = open_file_without_cache(
-                self.config_manager.file_system_path, "w+b"
-            )
+        self.fs_path_name = f"{self.config_manager.file_system_path}"
+
+        if not os.path.exists(self.fs_path_name):
+            self.fs = open_file_without_cache(self.fs_path_name, "w+b")
         else:
-            self.fs = open_file_without_cache(
-                self.config_manager.file_system_path, "r+b"
-            )
-        if os.path.getsize(self.config_manager.file_system_path) == 0:
+            self.fs = open_file_without_cache(self.fs_path_name, "r+b")
+        if os.path.getsize(self.fs_path_name) == 0:
             self.reserve_file()
 
         self.bitmap_manager = BitmapManager(
-            self.fs, self.config_manager.num_blocks, self.config_manager.block_size
+            self.fs,
+            self.config_manager.num_blocks,
+            self.config_manager.block_size,
         )
         self.index_manager = IndexManager(self.fs, self.config_manager)
         self.transaction_manager = TransactionManager()
@@ -55,10 +63,14 @@ class FileSystem:
             self.bitmap_manager.mark_used(0)
             self.index_manager.write_to_index(root)
 
+        self.logger.info(f"FileSystem initialized: {self.user_id}")
+
     def __del__(self):
-        self.fs.close()
+        self.shut_down()
 
     def shut_down(self):
+        self.logger.info("FileSystem shutting down...")
+        self.fs.flush()
         self.fs.close()
 
     """
@@ -187,6 +199,8 @@ class FileSystem:
             ]
             self.fs.write(block_data.ljust(self.config_manager.block_size, b"\0"))
             current_offset += len(block_data)
+
+            self.logger.info(f"Wrote {len(block_data)} bytes to block {block}")
 
         # Update bitmap to reflect that these blocks are now used
         self.transaction_manager.add_operation(

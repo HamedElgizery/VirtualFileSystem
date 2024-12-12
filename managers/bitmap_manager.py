@@ -1,12 +1,20 @@
 from typing import BinaryIO, Iterable, List, Optional
+import logging
 
 
 class BitmapManager:
-    def __init__(self, fs: BinaryIO, num_blocks: int, block_size: int):
+    def __init__(
+        self,
+        fs: BinaryIO,
+        num_blocks: int,
+        block_size: int,
+        logger: "logging.Logger" = None,
+    ):
         self.fs = fs
         self.bitmap = bytearray(num_blocks // 8)
         self.num_blocks = num_blocks
         self.block_size = block_size
+        self.logger = logger
 
     def load(self):
         self.bitmap = bytearray(self.fs.read(self.BITMAP_SIZE))
@@ -19,6 +27,9 @@ class BitmapManager:
         self.fs.write(bytes([self.bitmap[byte_index]]))
 
     def mark_blocks(self, blocks: Iterable[int], margin: Optional[int] = 0):
+        if self.logger:
+            self.logger.info(f"Marking blocks: {blocks} with margin {margin}")
+
         for block in blocks:
             self.mark_used(margin + block)
 
@@ -28,6 +39,9 @@ class BitmapManager:
         self.fs.write(b"\0" * self.block_size)
 
     def free_blocks(self, blocks: Iterable[int], margin: Optional[int] = 0):
+        if self.logger:
+            self.logger.info(f"Freeing blocks: {blocks} with margin {margin}")
+
         for block in blocks:
             self.free_block(margin + block)
 

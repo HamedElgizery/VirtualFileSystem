@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 import datetime
 
 from structs.metadata import Metadata
+from utility import setup_logger
 
 
 @dataclass(kw_only=True)
@@ -51,11 +53,14 @@ class FileSystemApi:
     def __init__(self, user_id: str, file_system: Optional[FileSystem] = None):
         self.user_id = user_id
 
+        self.logger = logging.getLogger(self.user_id)
+
         if file_system:
             self.file_system = file_system
         else:
             self.file_system = FileSystem(
-                file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}.disk"
+                file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}",
+                user_id=self.user_id,
             )
         self.current_directory = "/"
 
@@ -70,9 +75,11 @@ class FileSystemApi:
         :param metadata: A dictionary containing the metadata.
         :return: An instance of the API.
         """
+
         file_system = FileSystem(
-            file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}.disk",
+            file_system_name=f"{FileSystemApi.FS_PATH}/{user_id}",
             specs=Metadata(f"{FileSystemApi.FS_PATH}/{user_id}.disk", **metadata),
+            user_id=user_id,
         )
         return cls(user_id, file_system=file_system)
 
@@ -135,6 +142,7 @@ class FileSystemApi:
         if not self.file_system.is_directory(resolved_path):
             raise ValueError(f"The path '{resolved_path}' is not a valid directory.")
 
+        self.logger.info(f"Changed directory to {resolved_path}")
         self.current_directory = resolved_path
 
     def is_valid_path(self, file_path: str) -> bool:
@@ -183,6 +191,7 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.create_file(resolved_path, b"")
+        self.logger.info(f"Created empty file at {resolved_path}")
 
     def create_file(self, file_path: str, file_data: bytes) -> None:
         """
@@ -193,6 +202,9 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.create_file(resolved_path, file_data)
+        self.logger.info(
+            f"Created new file at {resolved_path} with data of length {len(file_data)}"
+        )
 
     def read_file(self, file_path: str) -> bytes:
         """
@@ -202,7 +214,9 @@ class FileSystemApi:
         :return: The contents of the file as bytes.
         """
         resolved_path = self.resolve_path(file_path)
-        return self.file_system.read_file(resolved_path)
+        data = self.file_system.read_file(resolved_path)
+        self.logger.info(f"Read {resolved_path} with data of length {len(data)}")
+        return data
 
     def edit_file(self, file_path: str, new_data: bytes) -> None:
         """
@@ -213,6 +227,9 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.edit_file(resolved_path, new_data)
+        self.logger.info(
+            f"Edited {resolved_path} with new data of length {len(new_data)}"
+        )
 
     def delete_file(self, file_path: str) -> None:
         """
@@ -222,6 +239,7 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.delete_file(resolved_path)
+        self.logger.info(f"Deleted {resolved_path}")
 
     def rename_file(self, file_path: str, new_name: str) -> None:
         """
@@ -232,6 +250,7 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.rename_file(resolved_path, new_name)
+        self.logger.info(f"Renamed {resolved_path} to {new_name}")
 
     def move_file(self, file_path: str, new_path: str) -> None:
         """
@@ -240,6 +259,7 @@ class FileSystemApi:
         :param file_path: The current path of the file to be moved.
         :param new_path: The new path where the file will be moved.
         """
+        self.logger.info(f"Moving {file_path} to {new_path}")
         self.file_system.move_file(file_path, new_path)
 
     def copy_file(self, file_path: str, copy_path: str) -> None:
@@ -257,6 +277,7 @@ class FileSystemApi:
         )
 
         self.file_system.copy_file(resolved_path, resolved_output_path)
+        self.logger.info(f"Copied {resolved_path} to {resolved_output_path}")
 
     # Will create a simple metadata for each file with timecreated, modification date file size etc
 
@@ -390,6 +411,12 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(dir_path)
         return self.file_system.get_file_size(resolved_path)
+
+    def make_directories(self, dir_path: str):
+        """
+        Will recursivally create all the directories in the path
+        """
+        pass
 
     """
     Other Operations.
