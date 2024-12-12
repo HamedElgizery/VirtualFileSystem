@@ -263,8 +263,7 @@ class FileSystem:
             raise ValueError("The specified path is a directory.")
 
         max_data_size = file_node.file_blocks * self.config_manager.block_size
-        new_data_blocks = len(new_data) // self.config_manager.block_size
-
+        new_data_blocks = math.ceil(len(new_data) / self.config_manager.block_size)
         factor = math.ceil(new_data_blocks / file_node.file_blocks)
         if factor >= 2:
             self.realign(file_node, factor)
@@ -459,7 +458,9 @@ class FileSystem:
     def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
         if file_index.is_directory:
             children = file_index.load_children(self)
-            self.bitmap_manager.free_block(file_index.file_start_block)
+            self.bitmap_manager.free_blocks(
+                range(file_index.file_blocks), file_index.file_start_block
+            )
 
             free_blocks = self.bitmap_manager.find_free_space_bitmap(
                 file_index.file_blocks * factor
@@ -484,7 +485,9 @@ class FileSystem:
 
         else:
             file_data = self.read_file(file_index)
-            self.bitmap_manager.free_block(file_index.file_start_block)
+            self.bitmap_manager.free_blocks(
+                range(file_index.file_blocks), file_index.file_start_block
+            )
 
             free_blocks = self.bitmap_manager.find_free_space_bitmap(
                 file_index.file_blocks * factor
