@@ -445,6 +445,13 @@ class FileSystem:
             rollback_args=[dir_node],
         )
 
+        local_transcation_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+
         local_transcation_manager.commit()
 
     def copy_directory(self, dir_path: str, new_dir_path: str) -> None:

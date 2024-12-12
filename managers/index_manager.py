@@ -35,7 +35,7 @@ class IndexManager:
         file_index.modification_date = int(round(time.time()))
         if file_index.id in self.index:
             self.index[file_index.id] = file_index
-            self.index_locations[file_index.id] = file_index.file_start_block
+            # self.index_locations[file_index.id] = file_index.file_start_block
             self.fs.seek(
                 self.config_manager.bitmap_size
                 + self.index_locations[file_index.id]
@@ -76,7 +76,7 @@ class IndexManager:
                     self.config_manager.max_length_childrens,
                 )
             )
-            self.index[file_index.id] = file_index
+            # self.index[file_index.id] = file_index
             self.index_locations[file_index.id] = i
 
             return
