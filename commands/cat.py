@@ -1,30 +1,18 @@
 from typing import TYPE_CHECKING, List
+from structs.base_command import BaseCommand
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
 
 
-"""
-Prints the contents of a file to the console.
+class CatCommand(BaseCommand):
+    name = "cat"
+    description = "Prints the contents of a file to the console."
+    arguments = [{"name": "file_path", "optional": False}]
 
-Usage:
-  cat <file>
-"""
+    def execute(self, args: List[str], fs: "FileSystemApi") -> str:
+        file_path = args[0]
 
+        file_contents = fs.read_file(file_path)
 
-def execute(args: List, fs: "FileSystemApi"):
-    """
-    Prints the contents of a file to the console.
-
-    :param args: The command line arguments.
-    :param fs: The file system.
-    """
-    if len(args) != 1:
-        print("Error: invalid number of arguments")
-        return
-
-    file_path = args[0]
-
-    file_contents = fs.read_file(file_path)
-
-    print(file_contents.decode())
+        return file_contents.decode()

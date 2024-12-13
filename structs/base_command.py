@@ -34,7 +34,8 @@ class BaseCommand(ABC):
         if target_file:
             self._write_output_to_file(output, target_file, append_mode, fs)
         else:
-            print(output)
+            if output.strip():
+                print(output)
 
     def _parse_redirection(self, args: List[str]) -> Tuple[Optional[str], bool]:
         if ">>" in args:

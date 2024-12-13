@@ -1,37 +1,23 @@
-"""
-Simulates the behavior of the 'touch' command to create a new file or update a file's last modified time.
-
-Usage:
-  touch <file_name>
-
-"""
-
-import os
-import time
 from typing import TYPE_CHECKING, List
-
+from structs.base_command import BaseCommand
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
 
 
-def execute(args: List, fs: "FileSystemApi"):
-    # Remove leading/trailing spaces from the argument
-    arg = args[0].strip()
+class TouchCommand(BaseCommand):
+    name = "touch"
+    description = "Creates a new file or updates a file's last modified time."
+    arguments = [{"name": "file_path", "optional": False}]
 
-    # Check if the argument is empty (no file name provided)
-    if not arg:
-        print("Error: Missing file name. Usage: touch <file_name>")
-        return
+    def execute(self, args: List[str], fs: "FileSystemApi") -> str:
+        file_path = args[0]
 
-    try:
-        # Check if the file already exists
-        if fs.exists(arg):
-            fs.file_system.update_file_access_time(arg)
+        if fs.exists(file_path):
+            if fs.is_directory(file_path):
+                raise ValueError(f"The path '{file_path}' is a directory.")
+
+            fs.file_system.update_file_access_time(file_path)
         else:
-            # If file doesn't exist, create it in append mode (so it won't overwrite existing content)
-            fs.create_empty_file(arg)
-
-    except OSError as e:
-        # Handle any OS-related errors and print a message
-        print(f"Error: Unable to create or modify file '{arg}'. {e}")
+            fs.create_empty_file(file_path)
+        return ""

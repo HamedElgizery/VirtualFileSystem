@@ -1,36 +1,21 @@
-"""
-Simulates the behavior of the 'rm' command to delete a file or a folder.
-
-Args:
-    args (list): The arguments passed to the command.
-"""
-
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+from structs.base_command import BaseCommand
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
 
 
-def execute(args: List, fs: "FileSystemApi"):
+class RmCommand(BaseCommand):
+    name = "rm"
+    description = "Removes a file or directory."
+    arguments = [{"name": "path", "optional": False}]
 
-    if not args:
-        print(
-            "Error: Missing file or directory name. Usage: rm <file_or_directory_name>"
-        )
-        return
-
-    target = args[0]
-
-    try:
-        if fs.is_directory(target):
-            # Remove directory
-            fs.delete_directory(target)
-            print(f"Directory '{target}' deleted successfully.")
+    def execute(self, args: List[str], fs: "FileSystemApi") -> str:
+        path = args[0]
+        if not fs.is_directory(path):
+            fs.delete_file(path)
+        elif fs.is_directory(path):
+            fs.delete_directory(path)
         else:
-            # Remove file
-            fs.delete_file(target)
-            print(f"File '{target}' deleted successfully.")
-    except FileNotFoundError:
-        print(f"Error: '{target}' not found.")
-    except Exception as e:
-        print(f"Error: Unable to delete '{target}'. {e}")
+            raise FileNotFoundError(f"{path} not found")
+        return ""

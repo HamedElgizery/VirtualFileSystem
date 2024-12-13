@@ -1,49 +1,18 @@
-"""
-Echoes a message or writes it to a file.
-Usage:
-  echo <message>                # Prints the message to the console
-  echo <message> > <file_path>  # Writes the message to a file (overwrite)
-  echo <message> >> <file_path> # Appends the message to a file
-"""
-
-from typing import TYPE_CHECKING
-
+from typing import TYPE_CHECKING, List
+from structs.base_command import BaseCommand
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
 
 
-def execute(args: list, fs: "FileSystemApi"):
-    try:
-        # Split the argument into components
-        if ">>" in args:
-            message, file_path = args[-3], args[-1]
-            mode = "append"
-        elif ">" in args:
-            message, file_path = args[-3], args[-1]
-            mode = "overwrite"
-        else:
-            # If no redirection, simply print the message
-            print(" ".join(args))
-            return
+class EchoCommand(BaseCommand):
+    name = "echo"
+    description = "Echoes a message or writes it to a file."
+    arguments = [
+        {"name": "message", "optional": False},
+        {"name": "file_path", "optional": True},
+    ]
 
-        # Resolve the file path
-
-        # Write or append to the file
-        if mode == "overwrite":
-            if not fs.exists(file_path):
-                fs.create_file(file_path, message.encode())
-            else:
-                fs.edit_file(file_path, message.encode())
-
-        elif mode == "append":
-            existing_data = fs.read_file(file_path)
-            updated_data = existing_data + message.encode()
-            fs.edit_file(file_path, updated_data)
-
-        print(
-            f"Message {'written to' if mode == 'overwrite' else 'appended to'} '{file_path}'."
-        )
-
-    except Exception as e:
-        print(f"Error: {e}")
+    def execute(self, args: List[str], fs: "FileSystemApi") -> str:
+        message = args[0]
+        return message

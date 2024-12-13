@@ -37,13 +37,13 @@ class ModularShell(cmd.Cmd):
             self.file_system_api = FileSystemApi.create_new_file_system(name)
 
     def load_commands(self):
-        command_files = glob.glob("new_commands/*.py")
+        command_files = glob.glob("commands/*.py")
         for file in command_files:
             module_name = os.path.splitext(os.path.basename(file))[0]
             if module_name == "__init__":
                 continue
 
-            module = importlib.import_module(f"new_commands.{module_name}")
+            module = importlib.import_module(f"commands.{module_name}")
 
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
