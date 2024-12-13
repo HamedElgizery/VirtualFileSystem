@@ -37,6 +37,9 @@ class TransactionManager:
                 operation["func"](*operation["func_args"])
                 executed_operations.append(operation)
         except Exception as e:
+            print(
+                f"doing roll back from {self.operations[len(executed_operations) - 1]}"
+            )
             self.rollback(executed_operations)
             raise e  # Re-raise the exception
         finally:

@@ -206,27 +206,42 @@ class FileIndexNode:
 
         file_system.fs.seek(children_data_start)
         file_system.fs.write(child_to_write.id.to_bytes(4, byteorder="big"))
+        file_system.fs.flush()
         self.children_count += 1
 
     def remove_child(self, file_system: "FileSystem", child_dir: str) -> None:
 
         children = self.load_children(file_system)
-        shifting = False
+        found = False
+
         for i, child in enumerate(children):
             if file_system.index_manager.index[child.id].file_name == child_dir:
-                shifting = True
+                found = True
                 continue
 
-            child_data_start = (
-                file_system.config_manager.bitmap_size
-                + file_system.config_manager.file_index_size
-                + self.file_start_block * file_system.config_manager.block_size
-                + 4 * (i - (1 if shifting else 0))
-            )
+            if found:
+                child_data_start = (
+                    file_system.config_manager.bitmap_size
+                    + file_system.config_manager.file_index_size
+                    + self.file_start_block * file_system.config_manager.block_size
+                    + 4 * (i - 1)
+                )
 
-            file_system.fs.seek(child_data_start)
-            file_system.fs.write(child.id.to_bytes(4, byteorder="big"))
+                if (
+                    4 * (i - 1)
+                    >= self.file_blocks * file_system.config_manager.block_size
+                ):
+                    raise ValueError(
+                        f"Directory {child_dir} is not a child of {self.file_name}"
+                    )
 
+                file_system.fs.seek(child_data_start)
+                file_system.fs.write(child.id.to_bytes(4, byteorder="big"))
+
+        if not found:
+            raise ValueError(f"Child '{child_dir}' not found.")
+
+        file_system.fs.flush()
         self.children_count -= 1
 
     # def remove_all_children(self, file_system: "FileSystem") -> None:

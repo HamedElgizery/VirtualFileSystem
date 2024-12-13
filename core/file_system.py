@@ -186,20 +186,32 @@ class FileSystem:
             raise Exception("File already exists.")
 
         # Write the new data to free blocks
-        current_offset = 0
-        for block in free_blocks:
-            self.fs.seek(
-                self.config_manager.bitmap_size
-                + self.config_manager.file_index_size
-                + block * self.config_manager.block_size
-            )
-            block_data = file_data[
-                current_offset : current_offset + self.config_manager.block_size
-            ]
-            self.fs.write(block_data.ljust(self.config_manager.block_size, b"\0"))
-            current_offset += len(block_data)
+        # current_offset = 0
+        # for block in free_blocks:
+        #     self.fs.seek(
+        #         self.config_manager.bitmap_size
+        #         + self.config_manager.file_index_size
+        #         + block * self.config_manager.block_size
+        #     )
+        #     block_data = file_data[
+        #         current_offset : current_offset + self.config_manager.block_size
+        #     ]
+        #     self.fs.write(block_data.ljust(self.config_manager.block_size, b"\0"))
+        #     current_offset += len(block_data)
 
-            self.logger.info(f"Wrote {len(block_data)} bytes to block {block}")
+        start_position = (
+            self.config_manager.bitmap_size
+            + self.config_manager.file_index_size
+            + file_start_block_index * self.config_manager.block_size
+        )
+        self.fs.seek(start_position)
+        self.fs.write(
+            file_data.ljust(num_blocks_needed * self.config_manager.block_size, b"\0")
+        )
+
+        self.logger.info(
+            f"Wrote {len(file_data)} bytes to start block {file_start_block_index}"
+        )
 
         # Update bitmap to reflect that these blocks are now used
         self.transaction_manager.add_operation(
@@ -214,6 +226,13 @@ class FileSystem:
             file_name=directories[-1],
             file_start_block=file_start_block_index,
             file_blocks=num_blocks_needed,
+        )
+
+        self.transaction_manager.add_operation(
+            self.clear_blocks_data,
+            rollback_func=None,
+            func_args=[free_blocks],
+            rollback_args=[],
         )
 
         self.transaction_manager.add_operation(
@@ -287,7 +306,9 @@ class FileSystem:
             + file_node.file_start_block * self.config_manager.block_size
         )
         self.fs.seek(start_position)
-        self.fs.write(new_data.ljust(max_data_size, b"\0"))
+        self.fs.write(
+            new_data.ljust(new_data_blocks * self.config_manager.block_size, b"\0")
+        )
 
     def delete_file(self, file_dir: str) -> None:
         parent_node, file_node = self.resolve_path(file_dir, True)
@@ -354,6 +375,13 @@ class FileSystem:
             rollback_func=self.bitmap_manager.free_block,
             func_args=[free_block],
             rollback_args=[free_block],
+        )
+
+        self.transaction_manager.add_operation(
+            self.clear_block_data,
+            rollback_func=None,
+            func_args=[free_block],
+            rollback_args=[],
         )
 
         self.transaction_manager.add_operation(
@@ -433,8 +461,8 @@ class FileSystem:
         local_transcation_manager.add_operation(
             parent_node.remove_child,
             rollback_func=parent_node.add_child,
-            func_args=[self, parent_node.file_name],
-            rollback_args=[self, parent_node],
+            func_args=[self, dir_node.file_name],
+            rollback_args=[self, dir_node],
         )
 
         local_transcation_manager.add_operation(
@@ -650,3 +678,11 @@ class FileSystem:
 
         for node in file_nodes:
             pass
+
+    def clear_block_data(self, block_number: int) -> None:
+        self.fs.seek(block_number * self.config_manager.block_size)
+        self.fs.write(b"\0" * self.config_manager.block_size)
+
+    def clear_blocks_data(self, blocks: List[int]) -> None:
+        for block in blocks:
+            self.clear_block_data(block)
