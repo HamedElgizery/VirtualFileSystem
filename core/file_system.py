@@ -165,9 +165,8 @@ class FileSystem:
         if not parent_node.is_directory:
             raise Exception("Parent directory does not exist or is not a directory.")
 
-        num_blocks_needed = (
-            len(file_data) + self.config_manager.block_size - 1
-        ) // self.config_manager.block_size
+        num_blocks_needed = math.ceil(len(file_data) / self.config_manager.block_size)
+
         num_blocks_needed = max(num_blocks_needed, 1)
         free_blocks = self.bitmap_manager.find_free_space_bitmap(num_blocks_needed)
         file_start_block_index = free_blocks[0]

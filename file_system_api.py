@@ -425,7 +425,17 @@ class FileSystemApi:
         """
         Will recursivally create all the directories in the path
         """
-        pass
+        resolved_path = self.resolve_path(dir_path)
+        split_path = resolved_path.split("/")
+        processed_path = "/"
+
+        for path in split_path:
+            processed_path = os.path.join(processed_path, path)
+            if self.exists(processed_path) and self.is_directory(processed_path):
+                continue
+            self.file_system.create_directory(processed_path)
+
+        return
 
     """
     Other Operations.
