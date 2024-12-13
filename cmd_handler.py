@@ -11,6 +11,7 @@ import glob
 from typing import List
 
 from file_system_api import FileSystemApi
+from structs.base_command import BaseCommand
 from utility import setup_logger
 
 
@@ -36,23 +37,38 @@ class ModularShell(cmd.Cmd):
             self.file_system_api = FileSystemApi.create_new_file_system(name)
 
     def load_commands(self):
-        command_files = glob.glob("commands/*.py")
+        command_files = glob.glob("new_commands/*.py")
         for file in command_files:
             module_name = os.path.splitext(os.path.basename(file))[0]
             if module_name == "__init__":
                 continue
 
-            module = importlib.import_module(f"commands.{module_name}")
-            self.modules_help[module_name] = (
-                module.__doc__.strip()
-                if module.__doc__
-                else "No help available for this command."
-            )
-            self.modules[module_name] = module
+            module = importlib.import_module(f"new_commands.{module_name}")
 
-            command_func = getattr(module, "execute", None)
-            if command_func:
-                self.add_command(module_name, command_func)
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (
+                    isinstance(attr, type)
+                    and issubclass(attr, BaseCommand)
+                    and attr is not BaseCommand
+                ):
+                    command_instance = attr()
+                    self.add_command(command_instance)
+
+                    self.modules_help[command_instance.name] = (
+                        command_instance.description
+                    )
+                    self.modules[command_instance.name] = command_instance
+            # self.modules_help[module_name] = (
+            #     module.__doc__.strip()
+            #     if module.__doc__
+            #     else "No help available for this command."
+            # )
+            # self.modules[module_name] = module
+
+            # command_func = getattr(module, "execute", None)
+            # if command_func:
+            #     self.add_command(module_name, command_func)
 
     def parse_args(self, args: str) -> List[str]:
         args_list = []
@@ -72,11 +88,11 @@ class ModularShell(cmd.Cmd):
 
         return args_list
 
-    def add_command(self, name, func):
+    def add_command(self, command_instance: BaseCommand):
         def wrapper(args):
             # Pass the FileSystemApi instance to each command
             try:
-                func(self.parse_args(args), self.file_system_api)
+                command_instance.run(self.parse_args(args), self.file_system_api)
             except Exception as e:
                 print(f"An Error Occured: {e}")
             finally:
@@ -86,7 +102,23 @@ class ModularShell(cmd.Cmd):
                 if self.file_system_api.current_directory == "/":
                     ModularShell.prompt = f"(yoyo) >> "
 
-        setattr(self, f"do_{name}", wrapper)
+        setattr(self, f"do_{command_instance.name}", wrapper)
+
+    # def add_command(self, name, func):
+    #     def wrapper(args):
+    #         # Pass the FileSystemApi instance to each command
+    #         try:
+    #             func(self.parse_args(args), self.file_system_api)
+    #         except Exception as e:
+    #             print(f"An Error Occured: {e}")
+    #         finally:
+    #             ModularShell.prompt = (
+    #                 f"(yoyo) {self.file_system_api.current_directory}>> "
+    #             )
+    #             if self.file_system_api.current_directory == "/":
+    #                 ModularShell.prompt = f"(yoyo) >> "
+
+    #     setattr(self, f"do_{name}", wrapper)
 
     def do_exit(self, arg):
         print("BIBI GO BYEBYE!")

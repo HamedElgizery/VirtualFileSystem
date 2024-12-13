@@ -35,7 +35,7 @@ class IndexManager:
         file_index.modification_date = int(round(time.time()))
         if file_index.id in self.index:
             self.index[file_index.id] = file_index
-            # self.index_locations[file_index.id] = file_index.file_start_block
+            self.index_locations[file_index.id] = file_index.file_start_block
             self.fs.seek(
                 self.config_manager.bitmap_size
                 + self.index_locations[file_index.id]
@@ -78,7 +78,7 @@ class IndexManager:
             )
             # self.index[file_index.id] = file_index
             self.index_locations[file_index.id] = i
-
+            self.fs.flush()
             return
 
         raise Exception("No space in file index.")
@@ -106,3 +106,4 @@ class IndexManager:
             + self.index_locations[file_index.id] * self.config_manager.index_entry_size
         )
         self.fs.write(b"\0" * self.config_manager.index_entry_size)
+        self.fs.flush()

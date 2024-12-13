@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List, Dict, Any
+from typing import TYPE_CHECKING, List, Dict, Any, Optional, Tuple
 
 if TYPE_CHECKING:
     from file_system_api import FileSystemApi
@@ -11,6 +11,7 @@ class BaseCommand(ABC):
     arguments: List[Dict[str, Any]]
 
     def __init__(self):
+
         if not hasattr(self, "name") or not self.name:
             raise ValueError("Command must have a 'name' attribute.")
         if not hasattr(self, "description") or not self.description:
@@ -19,8 +20,55 @@ class BaseCommand(ABC):
             self.arguments = []
 
     @abstractmethod
-    def execute(self, args: List[str], fs: "FileSystemApi"):
+    def execute(self, args: List[str], fs: "FileSystemApi") -> str:
         pass
+
+    def run(self, args: List[str], fs: "FileSystemApi"):
+        target_file, append_mode = self._parse_redirection(args)
+
+        # Validate and execute the command
+        self.validate_args(args)
+        output = self.execute(args, fs)
+
+        # Handle output
+        if target_file:
+            self._write_output_to_file(output, target_file, append_mode, fs)
+        else:
+            print(output)
+
+    def _parse_redirection(self, args: List[str]) -> Tuple[Optional[str], bool]:
+        if ">>" in args:
+            idx = args.index(">>")
+            target_file = args[idx + 1]
+            del args[idx:]
+            return target_file, True
+        elif ">" in args:
+            idx = args.index(">")
+            target_file = args[idx + 1]
+            del args[idx:]
+            return target_file, False
+        return None, False
+
+    def _write_output_to_file(
+        self, output: str, file_path: str, append_mode: bool, fs: "FileSystemApi"
+    ):
+
+        try:
+            if append_mode:
+                existing_data = fs.read_file(file_path)
+                updated_data = existing_data + output.encode()
+                fs.edit_file(file_path, updated_data)
+
+            else:
+                if not fs.exists(file_path):
+                    fs.create_file(file_path, output.encode())
+                else:
+                    fs.edit_file(file_path, output.encode())
+
+                pass
+
+        except Exception:
+            print(f"Error: Unable to write to file '{file_path}'.")
 
     def get_usage(self) -> str:
         usage = f"Usage: {self.name}"

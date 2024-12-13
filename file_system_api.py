@@ -87,7 +87,7 @@ class FileSystemApi:
     Important Utility Functions.
     """
 
-    def normalize_path(self, path):
+    def normalize_path(self, path: str) -> str:
         """Normalize the path and replace the separator with '/'.
 
         :param path: The path to normalize.
