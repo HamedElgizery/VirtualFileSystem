@@ -119,7 +119,7 @@ class ModularShell(cmd.Cmd):
     def do_save(self, arg):
         unique_id = uuid.uuid4().hex
         self.file_system_api.make_directories(f"{self.reply_directory}/{unique_id}")
-        data = self.recorded_commands.split("\n")
+        data = "\n".join(self.recorded_commands)
         self.file_system_api.create_file(
             f"{self.reply_directory}/{unique_id}/commands.txt", data.encode()
         )

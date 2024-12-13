@@ -430,7 +430,7 @@ class FileSystemApi:
         processed_path = "/"
 
         for path in split_path:
-            processed_path = os.path.join(processed_path, path)
+            processed_path = self.normalize_path(os.path.join(processed_path, path))
             if self.exists(processed_path) and self.is_directory(processed_path):
                 continue
             self.file_system.create_directory(processed_path)
