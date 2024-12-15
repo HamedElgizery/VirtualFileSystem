@@ -36,7 +36,7 @@ class ModularShell(cmd.Cmd):
         self.load_commands()
 
     def load_file_system(self, name: str):
-        if os.path.exists("file_system_disk/{name}.disk"):
+        if os.path.exists(f"file_system_disk/{name}.disk"):
             self.file_system_api = FileSystemApi(name)
         else:
             self.file_system_api = FileSystemApi.create_new_file_system(name)

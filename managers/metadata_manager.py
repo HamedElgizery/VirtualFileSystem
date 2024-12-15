@@ -4,7 +4,9 @@ import os
 
 class MetadataManager:
     def __init__(self, file_path, metadata: Metadata = None):
-        self.file_path = file_path
+        self.file_path = (
+            f"{file_path}.disk" if not file_path.endswith(".disk") else file_path
+        )
         if metadata:
             self.metadata = metadata
             self.write_metadata_file()

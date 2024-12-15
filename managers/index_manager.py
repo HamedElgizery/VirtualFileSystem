@@ -29,6 +29,7 @@ class IndexManager:
             self.index_locations[file_index.id] = i
 
     def write_to_index(self, file_index: FileIndexNode) -> None:
+
         if len(file_index.file_name) > self.config_manager.file_name_size:
             raise ValueError("File name too long.")
 
