@@ -8,16 +8,19 @@ class BitmapManager:
         fs: BinaryIO,
         num_blocks: int,
         block_size: int,
+        bitmap_size: int,
         logger: "logging.Logger" = None,
     ):
         self.fs = fs
-        self.bitmap = bytearray(num_blocks // 8)
         self.num_blocks = num_blocks
         self.block_size = block_size
         self.logger = logger
+        self.bitmap_size = bitmap_size
+        self.load()
 
     def load(self):
-        self.bitmap = bytearray(self.fs.read(self.BITMAP_SIZE))
+        self.fs.seek(0)
+        self.bitmap = bytearray(self.fs.read(self.bitmap_size))
 
     def mark_used(self, block: int):
         byte_index = block // 8

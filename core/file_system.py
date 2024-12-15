@@ -48,6 +48,7 @@ class FileSystem:
             self.fs,
             self.config_manager.num_blocks,
             self.config_manager.block_size,
+            self.config_manager.bitmap_size,
         )
         self.index_manager = IndexManager(self.fs, self.config_manager)
         self.transaction_manager = TransactionManager()
