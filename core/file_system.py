@@ -229,12 +229,12 @@ class FileSystem:
             file_blocks=num_blocks_needed,
         )
 
-        self.transaction_manager.add_operation(
-            self.clear_blocks_data,
-            rollback_func=None,
-            func_args=[free_blocks],
-            rollback_args=[],
-        )
+        # self.transaction_manager.add_operation(
+        #     self.clear_blocks_data,
+        #     rollback_func=None,
+        #     func_args=[free_blocks],
+        #     rollback_args=[],
+        # )
 
         self.transaction_manager.add_operation(
             parent_node.add_child,
@@ -276,12 +276,6 @@ class FileSystem:
 
         for i in range(file_node.file_blocks):
             data.append(self.fs.read(self.config_manager.block_size))
-            self.fs.seek(
-                self.config_manager.bitmap_size
-                + self.config_manager.file_index_size
-                + file_node.file_start_block * self.config_manager.block_size
-                + i * self.config_manager.block_size
-            )
 
         return b"".join(data).rstrip(b"\x00")
 
@@ -557,6 +551,8 @@ class FileSystem:
 
             for block in free_blocks:
                 self.bitmap_manager.mark_used(block)
+
+        self.index_manager.write_to_index(file_index)
 
     def reserve_file(self) -> None:
         self.fs.seek(
