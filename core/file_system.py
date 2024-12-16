@@ -53,11 +53,9 @@ class FileSystem:
         self.index_manager = IndexManager(self.fs, self.config_manager)
         self.transaction_manager = TransactionManager()
 
-        FileIndexNode.id_generator = lambda: self.metedata_manager.increment_id()
-
         root = self.index_manager.find_file_by_name(FileSystem.ROOT_DIR)
         if not root:
-            root = FileIndexNode(FileSystem.ROOT_DIR, 0, 1, is_directory=True)
+            root = FileIndexNode(FileSystem.ROOT_DIR, 0, 1, is_directory=True, id=0)
             root.id = 0  # id of the root directory is 0
             root.calculate_file_size(self.config_manager.block_size)
 
@@ -227,6 +225,7 @@ class FileSystem:
             file_name=directories[-1],
             file_start_block=file_start_block_index,
             file_blocks=num_blocks_needed,
+            id=self.metedata_manager.increment_id(),
         )
 
         # self.transaction_manager.add_operation(
@@ -363,6 +362,7 @@ class FileSystem:
             file_blocks=1,
             is_directory=True,
             children_count=0,
+            id=self.metedata_manager.increment_id(),
         )
 
         self.transaction_manager.add_operation(

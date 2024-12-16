@@ -10,21 +10,19 @@ if TYPE_CHECKING:
 
 
 class FileIndexNode:
-    id_generator = None
 
     def __init__(
         self,
         file_name: str,
         file_start_block: int,
         file_blocks: int,
+        id: int,
         is_directory: Optional[bool] = False,
         children_count: Optional[int] = 0,
-        no_id: Optional[bool] = False,
         creation_date: Optional[int] = None,
         modification_date: Optional[int] = None,
     ) -> None:
-        if not no_id:
-            self.id = FileIndexNode.id_generator()
+        self.id = id
         self.file_name: str = file_name
         self.file_start_block: int = file_start_block
         self.file_blocks: int = file_blocks
@@ -148,13 +146,12 @@ class FileIndexNode:
             file_name,
             file_start_block,
             file_blocks,
+            id,
             is_directory,
             children_count,
-            True,
             creation_date,
             modification_date,
         )
-        instance.id = id
         instance.calculate_file_size(file_system.config_manager.block_size)
         return instance
 
