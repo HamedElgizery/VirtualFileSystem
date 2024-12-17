@@ -1,3 +1,5 @@
+# TODO : make sure to add doc string to all classe and methods throughout the project
+
 import cmd
 import os
 import importlib
@@ -19,6 +21,9 @@ from cmd_handler import ModularShell
 
 class ModularShell(ModularShell):
 
+    def default(self, line):
+        self.printline(f"*** Unknown syntax: {line}")
+
     def cmdloop(self, intro=None):
         self.intro = intro or self.intro
         self.printline(self.intro)
@@ -29,9 +34,7 @@ class ModularShell(ModularShell):
             self.print(self.prompt)
 
             while True:
-                char = self.stdin.read(1).decode(
-                    "utf-8"
-                )  # Read one character from the channel
+                char = self.stdin.read(1).decode("utf-8")
                 if not char:  # End of input
                     break
 
@@ -46,15 +49,41 @@ class ModularShell(ModularShell):
                     continue
 
                 # Handle Backspace
-                if char in ("\x08", "\x7f"):  # Backspace or delete character
-                    if buffer:  # If there's something to delete
-                        buffer = buffer[:-1]  # Remove the last character
-                        self.print("\b \b")  # Move cursor back, clear char
+                if char in ("\x08", "\x7f"):
+                    if buffer:
+                        buffer = buffer[:-1]
+                        self.print("\b \b")
                     continue
 
-                # Add character to buffer and echo it
+                # Handle up and down arrow keys
+
+                if char == "\x1b":
+                    try:
+                        next_char = self.stdin.read(2).decode("utf-8")
+                    except:
+                        continue
+
+                    char += next_char
+                    if char == "\x1b[A":  # Up arrow
+                        if self.cmdqueue:
+                            buffer = self.cmdqueue.pop(0)
+                            self.print(f"\r{buffer}\r")
+                        continue
+                    elif char == "\x1b[B":  # Down arrow
+                        if self.cmdqueue:
+                            buffer = self.cmdqueue.pop(0)
+                            self.print(f"\r{buffer}\r")
+                        continue
+
+                    else:
+                        self.stdin.seek(self.stdin.tell() - 2)  # Put that faggot back
+
+                    # Escape
+                    continue
+
+                # Add the character and basically just echo it back
                 buffer += char
-                self.print(char)  # Echo back the typed character
+                self.print(char)
 
         except Exception as e:
             self.printline(f"Error: {e}")

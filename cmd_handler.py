@@ -1,13 +1,7 @@
-import cmd
-import os
-import importlib
-import glob
-import signal
-
-import cmd
-import os
-import importlib
-import glob
+from cmd import Cmd
+from os import path
+from importlib import import_module
+from glob import glob
 from typing import List
 import uuid
 
@@ -16,7 +10,7 @@ from structs.base_command import BaseCommand
 from utility import setup_logger
 
 
-class ModularShell(cmd.Cmd):
+class ModularShell(Cmd):
     intro = "Welcome to the Yoyo Shell. Type 'help' or '?' to list commands.\n"
     prompt = "(yoyo) >> "
 
@@ -40,7 +34,7 @@ class ModularShell(cmd.Cmd):
         self.print("\r\n")
 
     def load_file_system(self, name: str):
-        if os.path.exists(f"file_system_disk/{name}.disk"):
+        if path.exists(f"file_system_disk/{name}.disk"):
             self.file_system_api = FileSystemApi(name)
         else:
             self.file_system_api = FileSystemApi.create_new_file_system(name)
@@ -54,13 +48,13 @@ class ModularShell(cmd.Cmd):
         self.print(value + "\r\n")
 
     def load_commands(self):
-        command_files = glob.glob("commands/*.py")
+        command_files = glob("commands/*.py")
         for file in command_files:
-            module_name = os.path.splitext(os.path.basename(file))[0]
+            module_name = path.splitext(path.basename(file))[0]
             if module_name == "__init__":
                 continue
 
-            module = importlib.import_module(f"commands.{module_name}")
+            module = import_module(f"commands.{module_name}")
 
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
@@ -111,18 +105,17 @@ class ModularShell(cmd.Cmd):
                     f"(yoyo) {self.file_system_api.current_directory}>> "
                 )
                 if self.file_system_api.current_directory == "/":
-                    ModularShell.prompt = f"(yoyo) >> "
+                    ModularShell.prompt = "(yoyo) >> "
 
         setattr(self, f"do_{command_instance.name}", wrapper)
 
-    def do_exit(self, arg):
-        self.printline("BIBI GO BYEBYE!")
+    def do_exit(self, _):
+        self.printline("EXPLOSION!")
 
         return True
 
     def do_help(self, arg):
         if not arg:
-            # Default help behavior - list all commands
             commands = [name[3:] for name in dir(self) if name.startswith("do_")]
             commands += self.modules.keys()
             commands = set(commands)
@@ -134,7 +127,7 @@ class ModularShell(cmd.Cmd):
                 self.modules_help.get(arg, "No help available for this command.")
             )
 
-    def do_save(self, arg):
+    def do_save(self, _):
         unique_id = uuid.uuid4().hex
         self.file_system_api.make_directories(f"{self.reply_directory}/{unique_id}")
         data = "\n".join(self.recorded_commands)

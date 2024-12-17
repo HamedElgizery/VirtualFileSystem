@@ -297,10 +297,11 @@ class FileSystemApi:
         :param file_path: The path of the file to retrieve metadata for.
         :return: A dictionary containing file metadata.
         """
-        index_node = self.file_system.index_manager.find_file_by_name(file_path)
+        resolved_path = self.resolve_path(file_path)
+        index_node = self.file_system.resolve_path(resolved_path)
         file_metadata = FileMetadata(
             file_name=index_node.file_name,
-            file_path=file_path,
+            file_path=resolved_path,
             file_size=self.file_system.config_manager.block_size
             * index_node.file_blocks,
             is_directory=index_node.is_directory,
