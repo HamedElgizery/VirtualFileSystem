@@ -92,19 +92,23 @@ def listener():
 
     if server.username:  # Check if user authenticated
         user_data_path = get_user_data_path(server.username)
-        channel.send(f"[+] Welcome {server.username}! Your data directory is: {user_data_path}\n\r")
+        channel.send(
+            f"[+] Welcome {server.username}! Your data directory is: {user_data_path}\n\r"
+        )
 
-    shell = ModularShell("waryoyo", stdin=session_input, stdout=session_output)
+        shell = ModularShell(
+            server.username, stdin=session_input, stdout=session_output
+        )
 
-    try:
-        shell.cmdloop()
-    except Exception as e:
-        print(f"Error with user waryoyo: {e}")
-    finally:
-        channel.close()
+        try:
+            shell.cmdloop()
+        except Exception as e:
+            print(f"Error with user {server.username}: {e}")
+        finally:
+            channel.close()
+            t.close()
+
         t.close()
-
-    t.close()
 
 
 while True:
