@@ -19,6 +19,9 @@ from cmd_handler import ModularShell
 
 class ModularShell(ModularShell):
 
+    def default(self, line):
+        self.printline(f"*** Unknown syntax: {line}")
+
     def cmdloop(self, intro=None):
         self.intro = intro or self.intro
         self.printline(self.intro)
