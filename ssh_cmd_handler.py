@@ -1,3 +1,5 @@
+# TODO : make sure to add doc string to all classe and methods throughout the project
+
 import cmd
 import os
 import importlib
@@ -32,9 +34,7 @@ class ModularShell(ModularShell):
             self.print(self.prompt)
 
             while True:
-                char = self.stdin.read(1).decode(
-                    "utf-8"
-                )  # Read one character from the channel
+                char = self.stdin.read(1).decode("utf-8")
                 if not char:  # End of input
                     break
 
@@ -49,10 +49,10 @@ class ModularShell(ModularShell):
                     continue
 
                 # Handle Backspace
-                if char in ("\x08", "\x7f"):  # Backspace or delete character
-                    if buffer:  # If there's something to delete
-                        buffer = buffer[:-1]  # Remove the last character
-                        self.print("\b \b")  # Move cursor back, clear char
+                if char in ("\x08", "\x7f"):
+                    if buffer:
+                        buffer = buffer[:-1]
+                        self.print("\b \b")
                     continue
 
                 # Handle up and down arrow keys
@@ -76,14 +76,14 @@ class ModularShell(ModularShell):
                         continue
 
                     else:
-                        self.stdin.seek(self.stdin.tell() - 2)  # Put it back
+                        self.stdin.seek(self.stdin.tell() - 2)  # Put that faggot back
 
                     # Escape
                     continue
 
-                # Add character to buffer and echo it
+                # Add the character and basically just echo it back
                 buffer += char
-                self.print(char)  # Echo back the typed character
+                self.print(char)
 
         except Exception as e:
             self.printline(f"Error: {e}")
