@@ -21,10 +21,11 @@ class ModularShell(cmd.Cmd):
     prompt = "(yoyo) >> "
 
     reply_directory = "/replays"
+    use_rawinput = False
 
-    def __init__(self, user_id):
+    def __init__(self, user_id, stdin=None, stdout=None):
 
-        super().__init__()
+        super().__init__(completekey="tab", stdin=stdin, stdout=stdout)
         self.log_path = f"logs/{user_id}"
         self.user_id = user_id
         self.logger = setup_logger(self.log_path, user_id)
@@ -35,11 +36,22 @@ class ModularShell(cmd.Cmd):
         self.load_file_system(user_id)
         self.load_commands()
 
+    def emptyline(self):
+        self.print("\r\n")
+
     def load_file_system(self, name: str):
         if os.path.exists(f"file_system_disk/{name}.disk"):
             self.file_system_api = FileSystemApi(name)
         else:
             self.file_system_api = FileSystemApi.create_new_file_system(name)
+
+    def print(self, value):
+        if self.stdout and not self.stdout.closed:
+            self.stdout.write(value)
+            self.stdout.flush()
+
+    def printline(self, value):
+        self.print(value + "\r\n")
 
     def load_commands(self):
         command_files = glob.glob("commands/*.py")
@@ -88,9 +100,12 @@ class ModularShell(cmd.Cmd):
             # Pass the FileSystemApi instance to each command
             try:
                 self.recorded_commands.append(f"{command_instance.name} {args}")
-                command_instance.run(self.parse_args(args), self.file_system_api)
+                command_instance.run(
+                    self.parse_args(args), self.file_system_api, self.printline
+                )
             except Exception as e:
-                print(f"An Error Occured: {e}")
+                self.printline(f"An Error Occured: {e}")
+
             finally:
                 ModularShell.prompt = (
                     f"(yoyo) {self.file_system_api.current_directory}>> "
@@ -101,7 +116,8 @@ class ModularShell(cmd.Cmd):
         setattr(self, f"do_{command_instance.name}", wrapper)
 
     def do_exit(self, arg):
-        print("BIBI GO BYEBYE!")
+        self.printline("BIBI GO BYEBYE!")
+
         return True
 
     def do_help(self, arg):
@@ -110,11 +126,13 @@ class ModularShell(cmd.Cmd):
             commands = [name[3:] for name in dir(self) if name.startswith("do_")]
             commands += self.modules.keys()
             commands = set(commands)
-            print("Available commands:")
+            self.printline("Available commands:")
             for command in commands:
-                print(f"  {command}")
+                self.printline(f"  {command}")
         else:
-            print(self.modules_help.get(arg, "No help available for this command."))
+            self.printline(
+                self.modules_help.get(arg, "No help available for this command.")
+            )
 
     def do_save(self, arg):
         unique_id = uuid.uuid4().hex
@@ -123,7 +141,7 @@ class ModularShell(cmd.Cmd):
         self.file_system_api.create_file(
             f"{self.reply_directory}/{unique_id}/commands.txt", data.encode()
         )
-        print("File system replay saved successfully.")
+        self.printline("File system replay saved successfully.")
         self.recorded_commands = []
 
 

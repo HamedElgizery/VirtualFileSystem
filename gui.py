@@ -222,14 +222,9 @@ class FileExplorerGUI:
 
 
 if __name__ == "__main__":
-    # Assuming FileSystemApi class is already defined and instantiated as fs_api:
     fs_api = FileSystemApi(user_id="waryoyo")
-    # For demonstration, you'd provide a real FileSystemApi instance.
-    # fs_api = ...
 
     root = tk.Tk()
     explorer = FileExplorerGUI(root, fs_api)
-    # Since fs_api is not provided here, this won't run out-of-the-box.
-    # But this code demonstrates how you'd integrate it.
 
     root.mainloop()

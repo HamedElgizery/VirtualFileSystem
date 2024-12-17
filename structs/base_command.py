@@ -23,7 +23,7 @@ class BaseCommand(ABC):
     def execute(self, args: List[str], fs: "FileSystemApi") -> str:
         pass
 
-    def run(self, args: List[str], fs: "FileSystemApi"):
+    def run(self, args: List[str], fs: "FileSystemApi", printline):
         target_file, append_mode = self._parse_redirection(args)
 
         # Validate and execute the command
@@ -32,10 +32,10 @@ class BaseCommand(ABC):
 
         # Handle output
         if target_file:
-            self._write_output_to_file(output, target_file, append_mode, fs)
+            self._write_output_to_file(output, target_file, append_mode, fs, printline)
         else:
             if output.strip():
-                print(output)
+                printline(output)
 
     def _parse_redirection(self, args: List[str]) -> Tuple[Optional[str], bool]:
         if ">>" in args:
@@ -51,7 +51,12 @@ class BaseCommand(ABC):
         return None, False
 
     def _write_output_to_file(
-        self, output: str, file_path: str, append_mode: bool, fs: "FileSystemApi"
+        self,
+        output: str,
+        file_path: str,
+        append_mode: bool,
+        fs: "FileSystemApi",
+        printline,
     ):
 
         try:
@@ -69,7 +74,7 @@ class BaseCommand(ABC):
                 pass
 
         except Exception:
-            print(f"Error: Unable to write to file '{file_path}'.")
+            printline(f"Error: Unable to write to file '{file_path}'.")
 
     def get_usage(self) -> str:
         usage = f"Usage: {self.name}"

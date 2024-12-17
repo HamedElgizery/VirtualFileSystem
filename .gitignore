@@ -168,3 +168,4 @@ file
 *.dt
 
 .vscode/settings.json
+server_rsa_key.pem
