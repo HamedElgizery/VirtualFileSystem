@@ -35,7 +35,9 @@ class BaseCommand(ABC):
             self._write_output_to_file(output, target_file, append_mode, fs, printline)
         else:
             if output.strip():
-                printline(output)
+                output_lines = output.split("\n")
+                for line in output_lines:
+                    printline(line)
 
     def _parse_redirection(self, args: List[str]) -> Tuple[Optional[str], bool]:
         if ">>" in args:
