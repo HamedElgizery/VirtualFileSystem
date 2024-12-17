@@ -2,8 +2,6 @@ import cmd
 import os
 import importlib
 import glob
-import signal
-
 import cmd
 import os
 import importlib
@@ -122,7 +120,6 @@ class ModularShell(cmd.Cmd):
 
     def do_help(self, arg):
         if not arg:
-            # Default help behavior - list all commands
             commands = [name[3:] for name in dir(self) if name.startswith("do_")]
             commands += self.modules.keys()
             commands = set(commands)

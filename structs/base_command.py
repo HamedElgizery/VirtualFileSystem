@@ -73,8 +73,6 @@ class BaseCommand(ABC):
                 else:
                     fs.edit_file(file_path, output.encode())
 
-                pass
-
         except Exception:
             printline(f"Error: Unable to write to file '{file_path}'.")
 
