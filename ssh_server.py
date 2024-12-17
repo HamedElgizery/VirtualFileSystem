@@ -7,6 +7,7 @@ import threading
 import paramiko
 
 from ssh_cmd_handler import ModularShell
+from account_manger import authenticate_user, get_user_data_path  # Added imports
 
 KEY_PATH = "server_rsa_key.pem"
 logging.basicConfig()
@@ -36,13 +37,20 @@ host_key = paramiko.RSAKey(filename=KEY_PATH)
 class Server(paramiko.ServerInterface):
     def __init__(self):
         self.event = threading.Event()
+        self.username = None  # Added to store authenticated user
 
     def check_channel_request(self, kind, chanid):
         if kind == "session":
             return paramiko.OPEN_SUCCEEDED
 
     def check_auth_password(self, username, password):
-        return paramiko.AUTH_SUCCESSFUL
+        # Authenticate using account_manager
+        if authenticate_user(username, password):
+            print(f"User '{username}' authenticated successfully.")
+            self.username = username
+            return paramiko.AUTH_SUCCESSFUL
+        print(f"Authentication failed for user '{username}'.")
+        return paramiko.AUTH_FAILED
 
     def check_channel_exec_request(self, channel, command):
         # This is the command we need to parse
@@ -81,6 +89,10 @@ def listener():
     # Wait 30 seconds for a command
     session_output = channel.makefile("wU")
     session_input = channel.makefile("rU")
+
+    if server.username:  # Check if user authenticated
+        user_data_path = get_user_data_path(server.username)
+        channel.send(f"[+] Welcome {server.username}! Your data directory is: {user_data_path}\n\r")
 
     shell = ModularShell("waryoyo", stdin=session_input, stdout=session_output)
 
