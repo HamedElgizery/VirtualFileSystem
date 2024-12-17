@@ -55,6 +55,32 @@ class ModularShell(ModularShell):
                         self.print("\b \b")  # Move cursor back, clear char
                     continue
 
+                # Handle up and down arrow keys
+
+                if char == "\x1b":
+                    try:
+                        next_char = self.stdin.read(2).decode("utf-8")
+                    except:
+                        continue
+
+                    char += next_char
+                    if char == "\x1b[A":  # Up arrow
+                        if self.cmdqueue:
+                            buffer = self.cmdqueue.pop(0)
+                            self.print(f"\r{buffer}\r")
+                        continue
+                    elif char == "\x1b[B":  # Down arrow
+                        if self.cmdqueue:
+                            buffer = self.cmdqueue.pop(0)
+                            self.print(f"\r{buffer}\r")
+                        continue
+
+                    else:
+                        self.stdin.seek(self.stdin.tell() - 2)  # Put it back
+
+                    # Escape
+                    continue
+
                 # Add character to buffer and echo it
                 buffer += char
                 self.print(char)  # Echo back the typed character
