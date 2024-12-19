@@ -3,14 +3,16 @@ from tkinter import ttk, messagebox
 import os
 import datetime
 
-from file_system_api import FileSystemApi
+from ssh_file_system_api import SSHFileSystemApi
 
 
 class FileExplorerGUI:
-    def __init__(self, master, fs_api):
+    def __init__(self, master):
         self.master = master
-        self.fs_api = fs_api
+        self.ssh_api: SSHFileSystemApi = None
+        self.create_connection_prompt()
 
+    def initialize_theme(self):
         self.master.title("Modern Dark File Explorer")
         self.master.geometry("1024x600")
 
@@ -78,6 +80,7 @@ class FileExplorerGUI:
 
         self.style.theme_use("darkmode")
 
+    def initialize_gui(self):
         # Main frames: Left (tree), Right (details)
         self.main_frame = ttk.Frame(self.master)
         self.main_frame.pack(fill="both", expand=True)
@@ -92,7 +95,7 @@ class FileExplorerGUI:
         self.toolbar = ttk.Frame(self.details_frame)
         self.toolbar.pack(side="top", fill="x", pady=5, padx=5)
 
-        self.path_var = tk.StringVar(value=self.fs_api.current_directory)
+        self.path_var = tk.StringVar(value=self.ssh_api.pwd())
         self.path_entry = ttk.Entry(self.toolbar, textvariable=self.path_var)
         self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
@@ -145,6 +148,47 @@ class FileExplorerGUI:
         self.populate_tree_root()
         self.refresh()
 
+    def create_connection_prompt(self):
+        prompt = tk.Toplevel(self.master)
+        prompt.title("Connect to Server")
+        prompt.grab_set()  # Make the prompt modal
+
+        ttk.Label(prompt, text="IP Address:").grid(row=0, column=0, padx=5, pady=5)
+        ip_entry = ttk.Entry(prompt)
+        ip_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        ttk.Label(prompt, text="Port:").grid(row=1, column=0, padx=5, pady=5)
+        port_entry = ttk.Entry(prompt)
+        port_entry.grid(row=1, column=1, padx=5, pady=5)
+        port_entry.insert(0, "22")
+
+        ttk.Label(prompt, text="Username:").grid(row=2, column=0, padx=5, pady=5)
+        username_entry = ttk.Entry(prompt)
+        username_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        ttk.Label(prompt, text="Password:").grid(row=3, column=0, padx=5, pady=5)
+        password_entry = ttk.Entry(prompt, show="*")
+        password_entry.grid(row=3, column=1, padx=5, pady=5)
+
+        def connect():
+            ip = ip_entry.get()
+            port = int(port_entry.get())
+            username = username_entry.get()
+            password = password_entry.get()
+            try:
+                self.ssh_api = SSHFileSystemApi(ip, port, username, password)
+                prompt.grab_release()  # Release the modal property
+                prompt.destroy()
+                self.initialize_theme()
+                self.initialize_gui()
+            except Exception as e:
+                messagebox.showerror("Connection Error", str(e))
+
+        connect_button = ttk.Button(prompt, text="Connect", command=connect)
+        connect_button.grid(row=4, column=0, columnspan=2, pady=10)
+
+        prompt.wait_window()  # Wait for the prompt to close before continuing
+
     def populate_tree_root(self):
         # Populate the root directories (in this example, just "/")
         root_node = self.dir_tree.insert("", "end", text="/", open=True, values=("/"))
@@ -152,10 +196,10 @@ class FileExplorerGUI:
 
     def populate_tree(self, parent_node, path):
         try:
-            dirs = self.fs_api.list_directory_contents(path)
+            dirs = self.ssh_api.list_directory_contents(path)
             # Filter directories only, for the tree
             for d in dirs:
-                full_path = self.fs_api.resolve_path(os.path.join(path, d))
+                full_path = self.ssh_api.resolve_path(os.path.join(path, d))
                 if self.fs_api.is_directory(full_path):
                     node = self.dir_tree.insert(
                         parent_node, "end", text=d, values=(full_path,)
@@ -183,7 +227,7 @@ class FileExplorerGUI:
     def change_directory(self):
         new_path = self.path_var.get()
         try:
-            self.fs_api.change_directory(new_path)
+            self.ssh_api.change_directory(new_path)
             self.refresh()
         except Exception as e:
             messagebox.showerror("Error", str(e))
@@ -195,10 +239,9 @@ class FileExplorerGUI:
 
         current_path = self.path_var.get()
         try:
-            contents = self.fs_api.list_directory_contents(current_path)
+            contents = self.ssh_api.list_directory_contents(current_path)
             for item in contents:
-                full_path = self.fs_api.resolve_path(os.path.join(current_path, item))
-                meta = self.fs_api.get_file_metadata(full_path)
+                meta = self.ssh_api.get_file_metadata(os.path.join(current_path, item))
                 size_str = self._format_size(meta.file_size)
                 file_type = "Directory" if meta.is_directory else "File"
                 mod_time = (
@@ -222,9 +265,7 @@ class FileExplorerGUI:
 
 
 if __name__ == "__main__":
-    fs_api = FileSystemApi(user_id="waryoyo")
-
     root = tk.Tk()
-    explorer = FileExplorerGUI(root, fs_api)
+    explorer = FileExplorerGUI(root)
 
     root.mainloop()
