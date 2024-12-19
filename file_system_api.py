@@ -1,14 +1,11 @@
 import logging
 import os
+import datetime
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
 from core.file_system import FileSystem
-from managers.transaction_manager import TransactionManager
-from dataclasses import dataclass
-import datetime
-
 from structs.metadata import Metadata
-from utility import setup_logger
 
 
 @dataclass(kw_only=True)
@@ -83,9 +80,7 @@ class FileSystemApi:
         )
         return cls(user_id, file_system=file_system)
 
-    """
-    Important Utility Functions.
-    """
+    # Important Utility Functions.
 
     def normalize_path(self, path: str) -> str:
         """Normalize the path and replace the separator with '/'.
@@ -107,10 +102,10 @@ class FileSystemApi:
         if path in ["", ".", "./"]:
             # Current directory
             return self.current_directory
-        elif path == "..":
+        if path == "..":
             # Parent directory
             return os.path.dirname(self.current_directory)
-        elif path.startswith("./"):
+        if path.startswith("./"):
             # Strip the leading ./ and resolve relative to the current directory
             path = path[2:]
         elif path.startswith("/."):
@@ -128,9 +123,7 @@ class FileSystemApi:
         )
         return self.normalize_path(os.path.normpath(resolved_path))
 
-    """
-    Navigation Operations.
-    """
+    # Navigation Operations.
 
     def change_directory(self, file_path: str) -> None:
         """
@@ -142,7 +135,7 @@ class FileSystemApi:
         if not self.file_system.is_directory(resolved_path):
             raise ValueError(f"The path '{resolved_path}' is not a valid directory.")
 
-        self.logger.info(f"Changed directory to {resolved_path}")
+        self.logger.info("Changed directory to %s", resolved_path)
         self.current_directory = resolved_path
 
     def is_valid_path(self, file_path: str) -> bool:
@@ -179,9 +172,7 @@ class FileSystemApi:
         resolved_path = self.resolve_path(file_path)
         return self.is_valid_path(resolved_path)
 
-    """
-    File Operations.
-    """
+    # File Operations.
 
     def create_empty_file(self, file_path: str) -> None:
         """
@@ -191,7 +182,7 @@ class FileSystemApi:
         """
         resolved_path = self.resolve_path(file_path)
         self.file_system.create_file(resolved_path, b"")
-        self.logger.info(f"Created empty file at {resolved_path}")
+        self.logger.info("Created empty file at %s", resolved_path)
 
     def create_file(self, file_path: str, file_data: bytes) -> None:
         """
@@ -203,7 +194,9 @@ class FileSystemApi:
         resolved_path = self.resolve_path(file_path)
         self.file_system.create_file(resolved_path, file_data)
         self.logger.info(
-            f"Created new file at {resolved_path} with data of length {len(file_data)}"
+            "Created new file at %s with data of length %d",
+            resolved_path,
+            len(file_data),
         )
 
     def read_file(self, file_path: str) -> bytes:
@@ -436,24 +429,39 @@ class FileSystemApi:
                 continue
             self.file_system.create_directory(processed_path)
 
-        return
-
     """
     Other Operations.
     """
 
-    def search_for_file(self, file_name: str):
+    def search_for_file(self, file_name: str) -> List[str]:
+        """
+        Searches for a file in the entire filesystem and returns a list of paths
+        where the file was found.
+
+        :param file_name: The name of the file to search for.
+        :return: A list of paths where the file was found.
+        """
         pass
 
-    def get_free_space(self):
+    def get_free_space(self) -> int:
+        """
+        Returns the total amount of free space in the filesystem in bytes.
+
+        :return: The total amount of free space in the filesystem in bytes.
+        """
         pass
 
     def get_fragementation_precentage(self) -> float:
+        """
+        Calculates the percentage of free space that is fragmented.
+
+        :return: The percentage of free space that is fragmented.
+        """
         return self.get_fragementation_precentage()
 
-    def defragmentation(self):
+    def defragmentation(self) -> None:
+        """
+        Defragments the filesystem. This is a blocking operation and will take a
+        long time for large filesystems.
+        """
         pass
-
-    """
-    Custom Rollbacks.
-    """

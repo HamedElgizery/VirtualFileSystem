@@ -1,14 +1,39 @@
-# TODO : make sure to add doc string to all classe and methods throughout the project
+# This class is a modified version of the Cmd class in the cmd module
+# It has been modified to allow for basic line editing using the arrow keys
+# The line editing is quite basic and does not support things like
+# deleting characters or moving the cursor to a different position in the line
+# It just remembers the last 10 commands and allows you to recall them by pressing the up arrow
+# The down arrow will move down the list of previous commands
 
+"""
+This module provides a modified version of the Cmd class in the cmd module
+It has been modified to allow for basic line editing using the arrow keys
+The line editing is quite basic and does not support things like
+deleting characters or moving the cursor to a different position in the line
+It just remembers the last 10 commands and allows you to recall them by pressing the up arrow
+The down arrow will move down the list of previous commands
+"""
+
+
+import sys
 from cmd_handler import ModularShell
 
 
-class ModularShell(ModularShell):
+class SshModularShell(ModularShell):
+    """
+    This class is a modified version of the Cmd class in the cmd module
+    """
 
     def default(self, line):
+        """Prints an error message if the user enters a command that is not recognized"""
         self.printline(f"*** Unknown syntax: {line}")
 
     def cmdloop(self, intro=None):
+        """
+        This method is the main loop of the command shell.
+        It will keep reading commands from the user
+        and executing them until the user enters 'exit'.
+        """
         self.intro = intro or self.intro
         self.printline(self.intro)
         buffer = ""  # Buffer to store user input
@@ -23,7 +48,7 @@ class ModularShell(ModularShell):
                     break
 
                 # Handle Enter key
-                if char == "\r" or char == "\n":
+                if char in ("\r", "\n"):
                     self.print("\r\n")  # Echo newline
                     if buffer.strip():  # Execute command if not empty
                         if self.onecmd(buffer.strip()):  # Exit the shell on 'exit'
@@ -53,14 +78,13 @@ class ModularShell(ModularShell):
                             buffer = self.cmdqueue.pop(0)
                             self.print(f"\r{buffer}\r")
                         continue
-                    elif char == "\x1b[B":  # Down arrow
+                    if char == "\x1b[B":  # Down arrow
                         if self.cmdqueue:
                             buffer = self.cmdqueue.pop(0)
                             self.print(f"\r{buffer}\r")
                         continue
 
-                    else:
-                        self.stdin.seek(self.stdin.tell() - 2)  # Put that faggot back
+                    self.stdin.seek(self.stdin.tell() - 2)  # Put that faggot back
 
                     # Escape
                     continue
@@ -69,9 +93,9 @@ class ModularShell(ModularShell):
                 buffer += char
                 self.print(char)
 
-        except Exception as e:
-            self.printline(f"Error: {e}")
+        except Exception:
+            self.printline(f"Error: {sys.exc_info()[1]}")
 
 
 if __name__ == "__main__":
-    ModularShell("waryoyo").cmdloop()
+    SshModularShell("waryoyo").cmdloop()

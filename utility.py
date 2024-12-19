@@ -1,4 +1,12 @@
+"""Utility functions."""
+
+import logging
+import os
+
+
 def reset_seek_to_zero(func):
+    """A decorator that resets seek to 0 after a function is called."""
+
     def wrapper(self, *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
@@ -9,11 +17,17 @@ def reset_seek_to_zero(func):
     return wrapper
 
 
-import logging
-import os
-
-
 def open_file_without_cache(filepath, mode):
+    """
+    Opens a file without using the OS-level buffer cache.
+
+    Args:
+        filepath (str): The path to the file.
+        mode (str): The mode to open the file in.
+
+    Returns:
+        A file object.
+    """
     # Convert mode to os flags
     mode_flags = {
         "r": os.O_RDONLY,
@@ -34,14 +48,24 @@ def open_file_without_cache(filepath, mode):
     if os.name == "nt":
         flags |= os.O_BINARY
     else:
-        flags |= os.O_SYNC
+        flags |= os.O_SYNC  # pylint: disable=no-member
 
     fd = os.open(filepath, flags)
 
     return os.fdopen(fd, mode, buffering=0)
 
 
-def setup_logger(log_path: str, user_id: str):
+def setup_logger(log_path: str, user_id: str) -> logging.Logger:
+    """
+    Sets up a logger for the given user.
+
+    Args:
+        log_path (str): The path to the log file.
+        user_id (str): The user ID.
+
+    Returns:
+        The logger object.
+    """
     os.makedirs(log_path, exist_ok=True)
     log_file = os.path.join(log_path, "filesystem.log")
 

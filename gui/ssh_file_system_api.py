@@ -32,6 +32,13 @@ class SSHFileSystemApi:
         output = self.execute_command(f"pwd")
         return output.strip()
 
+    def write_file_content(self, path, content):
+        output = self.execute_command(f"echo '{content}' > {path}")
+
+    def read_file_content(self, path):
+        output = self.execute_command(f"cat {path}")
+        return output
+
     def get_file_metadata(self, path):
         output = self.execute_command(f"python3 gfs.py {path}")
         details = output.strip().split(",")

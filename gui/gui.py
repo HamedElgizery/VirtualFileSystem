@@ -1,271 +1,353 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import os
-import datetime
+import sys
 
 from ssh_file_system_api import SSHFileSystemApi
+import threading
+
+# For a nicer dark theme, we can use a dark background and custom styles.
+# Alternatively, consider using customtkinter for an even better look.
 
 
-class FileExplorerGUI:
-    def __init__(self, master):
-        self.master = master
-        self.ssh_api: SSHFileSystemApi = None
-        self.create_connection_prompt()
+class FileEditor(tk.Toplevel):
+    def __init__(self, master, ssh_api, filepath, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.ssh_api = ssh_api
+        self.filepath = filepath
+        self.title(f"Editing: {filepath}")
 
-    def initialize_theme(self):
-        self.master.title("Modern Dark File Explorer")
-        self.master.geometry("1024x600")
+        self.configure(bg="#2d2d2d")
 
-        # Create a style object
-        self.style = ttk.Style()
+        # A simple text widget for editing
+        self.text = tk.Text(
+            self, wrap="word", fg="#ffffff", bg="#3c3c3c", insertbackground="white"
+        )
+        self.text.pack(fill="both", expand=True)
 
-        # Create a new dark theme based on 'clam' or 'default'
-        # We use 'clam' as a base since it's quite neutral.
+        # Load file content
         try:
-            self.style.theme_create(
-                "darkmode",
-                parent="clam",
-                settings={
-                    "TFrame": {
-                        "configure": {"background": "#2b2b2b"}  # Dark grey background
-                    },
-                    "TLabel": {
-                        "configure": {
-                            "background": "#2b2b2b",
-                            "foreground": "#ffffff",
-                            "font": ("Segoe UI", 10),
-                        }
-                    },
-                    "TButton": {
-                        "configure": {
-                            "background": "#3c3f41",
-                            "foreground": "#ffffff",
-                            "font": ("Segoe UI", 10),
-                            "padding": 5,
-                        },
-                        "map": {"background": [("active", "#4f5355")]},
-                    },
-                    "TEntry": {
-                        "configure": {
-                            "fieldbackground": "#3c3f41",
-                            "foreground": "#ffffff",
-                            "insertcolor": "#ffffff",
-                            "font": ("Segoe UI", 10),
-                        }
-                    },
-                    "Treeview": {
-                        "configure": {
-                            "background": "#3c3f41",
-                            "foreground": "#ffffff",
-                            "fieldbackground": "#3c3f41",
-                            "font": ("Segoe UI", 10),
-                            "rowheight": 24,
-                        },
-                        "map": {
-                            "background": [("selected", "#616161")],
-                            "foreground": [("selected", "#ffffff")],
-                        },
-                    },
-                    "Vertical.TScrollbar": {
-                        "configure": {"background": "#3c3f41", "troughcolor": "#2b2b2b"}
-                    },
-                    "Horizontal.TScrollbar": {
-                        "configure": {"background": "#3c3f41", "troughcolor": "#2b2b2b"}
-                    },
-                },
-            )
-        except tk.TclError:
-            # If the theme already exists for some reason, pass
-            pass
+            content = self.ssh_api.get_file_content(filepath)
+            self.text.insert("1.0", content)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open file:\n{e}")
 
-        self.style.theme_use("darkmode")
+        # A save button
+        button_frame = tk.Frame(self, bg="#2d2d2d")
+        button_frame.pack(side="bottom", fill="x", pady=5)
 
-    def initialize_gui(self):
-        # Main frames: Left (tree), Right (details)
-        self.main_frame = ttk.Frame(self.master)
-        self.main_frame.pack(fill="both", expand=True)
+        save_button = tk.Button(
+            button_frame,
+            text="Save",
+            command=self.save_file,
+            bg="#444444",
+            fg="white",
+            highlightbackground="#2d2d2d",
+        )
+        save_button.pack(side="right", padx=10)
 
-        self.tree_frame = ttk.Frame(self.main_frame)
+        cancel_button = tk.Button(
+            button_frame,
+            text="Close",
+            command=self.destroy,
+            bg="#444444",
+            fg="white",
+            highlightbackground="#2d2d2d",
+        )
+        cancel_button.pack(side="right", padx=10)
+
+        self.run_in_thread(
+            self.ssh_api.get_file_content, (filepath,), self.on_file_content_loaded
+        )
+
+    def on_file_content_loaded(self, content, error):
+        if error:
+            messagebox.showerror("Error", f"Failed to open file:\n{error}")
+        else:
+            self.text.delete("1.0", "end")
+            self.text.insert("1.0", content)
+
+    def save_file(self):
+        content = self.text.get("1.0", "end-1c")
+        self.run_in_thread(
+            self.ssh_api.write_file_content,
+            (self.filepath, content),
+            self.on_file_saved,
+        )
+
+    def on_file_saved(self, result, error):
+        if error:
+            messagebox.showerror("Error", f"Failed to save file:\n{error}")
+        else:
+            messagebox.showinfo("Saved", f"File {self.filepath} saved successfully.")
+
+    def run_in_thread(self, func, args, callback):
+        # Generic helper to run blocking SSH calls in a separate thread
+        def worker():
+            try:
+                res = func(*args)
+                self.after(0, callback, res, None)
+            except Exception as e:
+                self.after(0, callback, None, e)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+
+class FileExplorer(tk.Frame):
+    def __init__(self, master, ssh_api, start_path=".", *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.ssh_api = ssh_api
+        self.current_path = start_path
+
+        self.configure(bg="#2d2d2d")
+
+        # Setup the layout: left tree frame and right file list
+        self.tree_frame = tk.Frame(self, bg="#2d2d2d")
         self.tree_frame.pack(side="left", fill="y")
 
-        self.details_frame = ttk.Frame(self.main_frame)
-        self.details_frame.pack(side="right", fill="both", expand=True)
+        self.content_frame = tk.Frame(self, bg="#2d2d2d")
+        self.content_frame.pack(side="right", fill="both", expand=True)
 
-        # Toolbar
-        self.toolbar = ttk.Frame(self.details_frame)
-        self.toolbar.pack(side="top", fill="x", pady=5, padx=5)
+        # Directory tree
+        self.dir_tree = ttk.Treeview(self.tree_frame, show="tree")
+        self.dir_tree.pack(fill="y", expand=True)
 
-        self.path_var = tk.StringVar(value=self.ssh_api.pwd())
-        self.path_entry = ttk.Entry(self.toolbar, textvariable=self.path_var)
-        self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        # Style adjustments for dark theme
+        style = ttk.Style()
+        if sys.platform == "win32":
+            # On Windows, you can try 'xpnative' or other themes and then modify their colors
+            style.theme_use("default")
+        else:
+            style.theme_use("default")
 
-        self.go_button = ttk.Button(
-            self.toolbar, text="Go", command=self.change_directory
+        style.configure(
+            "Treeview",
+            background="#3c3c3c",
+            foreground="white",
+            fieldbackground="#3c3c3c",
+            bordercolor="#3c3c3c",
         )
-        self.go_button.pack(side="left", padx=(0, 5))
+        style.map("Treeview", background=[("selected", "#555555")])
 
-        self.refresh_button = ttk.Button(
-            self.toolbar, text="Refresh", command=self.refresh
-        )
-        self.refresh_button.pack(side="left")
-
-        # Directory Tree View
-        self.dir_tree = ttk.Treeview(self.tree_frame, show="tree", selectmode="browse")
-        self.dir_tree.pack(fill="y", expand=True, padx=5, pady=5)
-
-        self.dir_scrollbar = ttk.Scrollbar(
-            self.tree_frame, orient="vertical", command=self.dir_tree.yview
-        )
-        self.dir_scrollbar.pack(side="right", fill="y")
-        self.dir_tree.configure(yscrollcommand=self.dir_scrollbar.set)
-
-        self.dir_tree.bind("<<TreeviewOpen>>", self.on_tree_open)
-        self.dir_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-
-        # File List View
-        columns = ("Name", "Size", "Type", "Modified")
+        # File List
         self.file_list = ttk.Treeview(
-            self.details_frame, columns=columns, show="headings"
+            self.content_frame, columns=["Name", "Size", "Modified"], show="headings"
         )
-        for col in columns:
-            self.file_list.heading(col, text=col)
-            self.file_list.column(col, anchor="w", width=150)
+        self.file_list.heading("Name", text="Name")
+        self.file_list.heading("Size", text="Size")
+        self.file_list.heading("Modified", text="Modified")
+        self.file_list.column("Name", anchor="w", width=200)
+        self.file_list.column("Size", anchor="e", width=100)
+        self.file_list.column("Modified", anchor="w", width=150)
+        self.file_list.pack(fill="both", expand=True)
 
-        self.file_list.pack(fill="both", expand=True, padx=5, pady=5)
+        style.configure("Treeview.Heading", background="#2d2d2d", foreground="white")
 
-        self.file_scrollbar_y = ttk.Scrollbar(
-            self.details_frame, orient="vertical", command=self.file_list.yview
+        # Bind events
+        self.dir_tree.bind("<<TreeviewOpen>>", self.on_dir_expand)
+        self.file_list.bind("<Double-1>", self.on_file_open)
+
+        # Populate the root directory in the tree
+        root_node = self.dir_tree.insert(
+            "", "end", text=start_path, open=True, values=[start_path]
         )
-        self.file_scrollbar_y.pack(side="right", fill="y")
-        self.file_list.configure(yscrollcommand=self.file_scrollbar_y.set)
+        self.populate_tree(root_node, start_path)
 
-        self.file_scrollbar_x = ttk.Scrollbar(
-            self.details_frame, orient="horizontal", command=self.file_list.xview
-        )
-        self.file_scrollbar_x.pack(side="bottom", fill="x")
-        self.file_list.configure(xscrollcommand=self.file_scrollbar_x.set)
-
-        self.populate_tree_root()
-        self.refresh()
-
-    def create_connection_prompt(self):
-        prompt = tk.Toplevel(self.master)
-        prompt.title("Connect to Server")
-        prompt.grab_set()  # Make the prompt modal
-
-        ttk.Label(prompt, text="IP Address:").grid(row=0, column=0, padx=5, pady=5)
-        ip_entry = ttk.Entry(prompt)
-        ip_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        ttk.Label(prompt, text="Port:").grid(row=1, column=0, padx=5, pady=5)
-        port_entry = ttk.Entry(prompt)
-        port_entry.grid(row=1, column=1, padx=5, pady=5)
-        port_entry.insert(0, "22")
-
-        ttk.Label(prompt, text="Username:").grid(row=2, column=0, padx=5, pady=5)
-        username_entry = ttk.Entry(prompt)
-        username_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        ttk.Label(prompt, text="Password:").grid(row=3, column=0, padx=5, pady=5)
-        password_entry = ttk.Entry(prompt, show="*")
-        password_entry.grid(row=3, column=1, padx=5, pady=5)
-
-        def connect():
-            ip = ip_entry.get()
-            port = int(port_entry.get())
-            username = username_entry.get()
-            password = password_entry.get()
-            try:
-                self.ssh_api = SSHFileSystemApi(ip, port, username, password)
-                prompt.grab_release()  # Release the modal property
-                prompt.destroy()
-                self.initialize_theme()
-                self.initialize_gui()
-            except Exception as e:
-                messagebox.showerror("Connection Error", str(e))
-
-        connect_button = ttk.Button(prompt, text="Connect", command=connect)
-        connect_button.grid(row=4, column=0, columnspan=2, pady=10)
-
-        prompt.wait_window()  # Wait for the prompt to close before continuing
-
-    def populate_tree_root(self):
-        # Populate the root directories (in this example, just "/")
-        root_node = self.dir_tree.insert("", "end", text="/", open=True, values=("/"))
-        self.populate_tree(root_node, "/")
+        # Display contents of start_path
+        self.display_directory_contents(start_path)
 
     def populate_tree(self, parent_node, path):
-        try:
-            dirs = self.ssh_api.list_directory_contents(path)
-            # Filter directories only, for the tree
-            for d in dirs:
-                full_path = self.ssh_api.resolve_path(os.path.join(path, d))
-                if self.fs_api.is_directory(full_path):
-                    node = self.dir_tree.insert(
-                        parent_node, "end", text=d, values=(full_path,)
-                    )
-                    # Add a dummy child so we can expand this node later
-                    self.dir_tree.insert(node, "end", text="...")
-        except Exception as e:
-            print(f"Error populating tree: {e}")
+        # We'll load directories asynchronously
+        self.run_in_thread(
+            self.ssh_api.list_directory_contents,
+            (path,),
+            lambda result, error: self.on_list_dir_for_tree(
+                result, error, parent_node, path
+            ),
+        )
 
-    def on_tree_open(self, event):
-        node = self.dir_tree.selection()[0]
-        path = self.dir_tree.item(node, "values")[0]
+    def on_list_dir_for_tree(self, items, error, parent_node, path):
+        if error:
+            # Just ignore errors here or show a message
+            return
+        # Clear any placeholder
+        for child in self.dir_tree.get_children(parent_node):
+            if self.dir_tree.item(child, "text") == "...":
+                self.dir_tree.delete(child)
+        # Insert directories
+        for item in items:
+            full_path = self.join_path(path, item)
+            # We can check directories asynchronously as well
+            self.run_in_thread(
+                self.ssh_api.is_directory,
+                (full_path,),
+                lambda is_dir, err: self.on_check_directory(
+                    is_dir, err, parent_node, item, full_path
+                ),
+            )
 
-        # Clear existing children (the dummy one)
-        self.dir_tree.delete(*self.dir_tree.get_children(node))
-        # Repopulate
-        self.populate_tree(node, path)
+    def on_check_directory(self, is_dir, error, parent_node, item, full_path):
+        if error:
+            return
+        if is_dir:
+            node = self.dir_tree.insert(
+                parent_node, "end", text=item, values=[full_path]
+            )
+            # Add placeholder for lazy loading:
+            self.dir_tree.insert(node, "end", text="...")
 
-    def on_tree_select(self, event):
-        node = self.dir_tree.selection()[0]
-        path = self.dir_tree.item(node, "values")[0]
-        self.path_var.set(path)
-        self.refresh()
+    def on_dir_expand(self, event):
+        node = self.dir_tree.focus()
+        node_path = self.dir_tree.item(node, "values")[0]
+        # When expanded, re-populate (in case we had placeholders)
+        self.populate_tree(node, node_path)
+        self.display_directory_contents(node_path)
+        self.current_path = node_path
 
-    def change_directory(self):
-        new_path = self.path_var.get()
-        try:
-            self.ssh_api.change_directory(new_path)
-            self.refresh()
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+    def on_file_open(self, event):
+        selection = self.file_list.focus()
+        if not selection:
+            return
+        item_values = self.file_list.item(selection, "values")
+        if not item_values:
+            return
+        filename = item_values[0]
+        full_path = self.join_path(self.current_path, filename)
 
-    def refresh(self):
-        # Clear the file list
-        for row in self.file_list.get_children():
-            self.file_list.delete(row)
+        # Check if directory or file
+        self.run_in_thread(
+            self.ssh_api.is_directory,
+            (full_path,),
+            lambda is_dir, error: self.on_file_open_check(is_dir, error, full_path),
+        )
 
-        current_path = self.path_var.get()
-        try:
-            contents = self.ssh_api.list_directory_contents(current_path)
-            for item in contents:
-                meta = self.ssh_api.get_file_metadata(os.path.join(current_path, item))
-                size_str = self._format_size(meta.file_size)
-                file_type = "Directory" if meta.is_directory else "File"
-                mod_time = (
-                    meta.modification_date.strftime("%Y-%m-%d %H:%M:%S")
-                    if meta.modification_date
-                    else ""
-                )
-                self.file_list.insert(
-                    "", "end", values=(item, size_str, file_type, mod_time)
-                )
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+    def on_file_open_check(self, is_dir, error, full_path):
+        if error:
+            messagebox.showerror("Error", f"Unable to check file type:\n{error}")
+            return
+        if is_dir:
+            self.display_directory_contents(full_path)
+            self.current_path = full_path
+        else:
+            # Open file editor
+            FileEditor(self.master, self.ssh_api, full_path)
 
-    def _format_size(self, size_bytes):
-        # Simple human-readable format
-        for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if size_bytes < 1024:
-                return f"{size_bytes:.1f}{unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.1f}PB"
+    def display_directory_contents(self, path):
+        # Show loading cursor
+        self.master.config(cursor="wait")
+        # List directory in thread
+        self.run_in_thread(
+            self.ssh_api.list_directory_contents,
+            (path,),
+            lambda items, error: self.on_dir_listed_for_contents(items, error, path),
+        )
+
+    def on_dir_listed_for_contents(self, items, error, path):
+        self.master.config(cursor="")
+        if error:
+            messagebox.showerror("Error", f"Unable to list directory:\n{error}")
+            return
+        # Clear file_list
+        for item in self.file_list.get_children():
+            self.file_list.delete(item)
+        # Now get metadata for each item asynchronously
+        # We'll load them one by one to avoid blocking
+        # For simplicity, we do them in a loop (could be improved by parallelizing)
+
+        def load_metadata(i=0):
+            if i >= len(items):
+                return
+            filename = items[i]
+            full_path = self.join_path(path, filename)
+            self.run_in_thread(
+                self.ssh_api.get_file_metadata,
+                (full_path,),
+                lambda meta, err, idx=i, fname=filename: self.on_got_metadata(
+                    meta, err, fname, idx, items, path, load_metadata
+                ),
+            )
+
+        load_metadata(0)
+
+    def on_got_metadata(self, meta, error, filename, index, items, path, callback):
+        if error:
+            # If we can't get metadata, just skip this file
+            pass
+        else:
+            size = meta["file_size"]
+            mod = meta["modification_date"]
+            self.file_list.insert("", "end", values=(filename, size, mod))
+        # Move to next item
+        callback(index + 1)
+
+    def join_path(self, base, name):
+        if base.endswith("/"):
+            return base + name
+        else:
+            return base + "/" + name
+
+    def run_in_thread(self, func, args, callback):
+        # Generic helper to run blocking SSH calls in a separate thread
+        def worker():
+            try:
+                res = func(*args)
+                self.after(0, callback, res, None)
+            except Exception as e:
+                self.after(0, callback, None, e)
+
+        threading.Thread(target=worker, daemon=True).start()
 
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    explorer = FileExplorerGUI(root)
+class DarkApp(tk.Tk):
+    def __init__(self, ssh_api, start_path=".", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ssh_api = ssh_api
+        self.title("SSH File Explorer")
 
-    root.mainloop()
+        self.configure(bg="#2d2d2d")
+
+        # Create menu or top bar if desired
+        menubar = tk.Menu(self, tearoff=False, bg="#2d2d2d", fg="white")
+        filemenu = tk.Menu(menubar, tearoff=False, bg="#2d2d2d", fg="white")
+        filemenu.add_command(label="Exit", command=self.destroy)
+        menubar.add_cascade(label="File", menu=filemenu)
+
+        self.config(menu=menubar)
+
+        self.explorer = FileExplorer(self, self.ssh_api, start_path=start_path)
+        self.explorer.pack(fill="both", expand=True)
+
+
+# Example usage (assuming you have implemented get_file_content and write_file_content in SSHFileSystemApi):
+
+"""
+from your_ssh_module import SSHFileSystemApi
+
+# Create the SSH connection
+
+
+# Make sure you've added:
+# 1. A method to read file content, e.g.:
+#    def get_file_content(self, path):
+#        output = self.execute_command(f"cat {path}")
+#        return output
+#
+# 2. A method to write file content, e.g.:
+#    def write_file_content(self, path, content):
+#        # You might use echo or a temporary file + mv strategy
+#        # For example:
+#        temp_path = "/tmp/temp_file.txt"
+#        # Escape quotes in content as needed
+#        content_escaped = content.replace('"', '\\"')
+#        self.execute_command(f'echo "{content_escaped}" > {temp_path} && mv {temp_path} "{path}"')
+
+
+"""
+ssh_api = SSHFileSystemApi(
+    host="localhost", port=2222, username="warcock", password="cock"
+)
+
+app = DarkApp(ssh_api, start_path=".")
+app.mainloop()
+
+# Remember to close SSH connection when done:
+ssh_api.close()
