@@ -1,4 +1,4 @@
-from typing import BinaryIO, Iterable, List, Optional
+from typing import BinaryIO, Iterable, Optional
 import logging
 
 

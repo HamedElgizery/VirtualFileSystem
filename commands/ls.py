@@ -28,9 +28,7 @@ class LsCommand(BaseCommand):
             if use_long_format:
                 for item in contents:
                     metadata = fs.get_file_metadata(os.path.join(path, item))
-                    output += (
-                        f"{item} {metadata.file_size} {metadata.modification_date}\n"
-                    )
+                    output += f"{item} {metadata.file_size} {metadata.modification_date} {metadata.is_directory}\n"
             else:
                 for item in contents:
                     output += f"{item}\n"

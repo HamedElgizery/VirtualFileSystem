@@ -1,16 +1,16 @@
-from typing import BinaryIO, Callable, Dict, List, Optional
-from utility import reset_seek_to_zero
+from typing import List, Optional
 from typing import TYPE_CHECKING
 import time
 
 if TYPE_CHECKING:
     from core.file_system import FileSystem
 
-# TODO: need to update code here a bit so it doesnt take the entire filesystem directly if it wants to do an operation or if it will just dont name it config and pass only methods it might need
+# TODO: need to update code here a bit so it doesnt take the entire filesystem directly if it wants to do an operation
+# TODO: or if it will just dont name it config and pass only methods it might need
 
 
 class FileIndexNode:
-
+    # TODO : change id into file_id
     def __init__(
         self,
         file_name: str,
@@ -37,12 +37,12 @@ class FileIndexNode:
         creation_date: Optional[int] = None,
         modification_date: Optional[int] = None,
     ):
-        if creation_date == None:
+        if creation_date is None:
             self.creation_date = int(round(time.time()))
         else:
             self.creation_date = creation_date
 
-        if modification_date == None:
+        if modification_date is None:
             self.modification_date = int(round(time.time()))
         else:
             self.modification_date = modification_date
@@ -65,20 +65,20 @@ class FileIndexNode:
 
     def to_bytes(
         self,
-        FILE_NAME_SIZE,
-        MAX_FILE_BLOCKS,
-        FILE_START_BLOCK_INDEX_SIZE,
-        MAX_LENGTH_CHILDRENS,
+        file_name_size,
+        max_file_blocks,
+        file_start_block_index_size,
+        max_length_childrens,
     ) -> bytes:
         id_bytes = self.id.to_bytes(4, byteorder="big")
-        file_name_bytes = self.file_name.encode("utf-8").ljust(FILE_NAME_SIZE, b"\0")
-        file_blocks_bytes = self.file_blocks.to_bytes(MAX_FILE_BLOCKS, byteorder="big")
+        file_name_bytes = self.file_name.encode("utf-8").ljust(file_name_size, b"\0")
+        file_blocks_bytes = self.file_blocks.to_bytes(max_file_blocks, byteorder="big")
         file_start_block_bytes = self.file_start_block.to_bytes(
-            FILE_START_BLOCK_INDEX_SIZE, byteorder="big"
+            file_start_block_index_size, byteorder="big"
         )
         is_directory_byte = b"\1" if self.is_directory else b"\0"
         children_count_bytes = self.children_count.to_bytes(
-            MAX_LENGTH_CHILDRENS, byteorder="big"
+            max_length_childrens, byteorder="big"
         )
 
         creation_date = self.creation_date.to_bytes(4, byteorder="big")

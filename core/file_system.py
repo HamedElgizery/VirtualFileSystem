@@ -489,6 +489,11 @@ class FileSystem:
 
         self.create_directory(new_dir_path)
         for child in children:
+            if child.is_directory:
+                self.copy_directory(
+                    f"{dir_path}/{child.file_name}", f"{new_dir_path}/{child.file_name}"
+                )
+                continue
             self.copy_file(
                 f"{dir_path}/{child.file_name}", f"{new_dir_path}/{child.file_name}"
             )
@@ -595,7 +600,7 @@ class FileSystem:
 
     def move_file(self, old_dir: str, new_dir: str) -> None:
         parent_node, file_node = self.resolve_path(old_dir, True)
-        target_node = self.resolve_path(new_dir)
+        target_node = self.resolve_path("/".join(new_dir.split("/")[:-1]) or "/")
         if not file_node:
             raise FileNotFoundError(f"File '{old_dir}' not found.")
 

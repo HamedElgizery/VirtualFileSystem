@@ -9,7 +9,7 @@ import paramiko
 from ssh_cmd_handler import ModularShell
 from ssh.account_manager import (
     AccountManager,
-)  # Added imports
+)
 
 KEY_PATH = "ssh/rsa_key/server_rsa_key.pem"
 logging.basicConfig()
@@ -67,11 +67,11 @@ class Server(paramiko.ServerInterface):
         self.event.set()
         return True
 
-    def check_channel_shell_request(self, channel):
+    def check_channel_shell_request(self, _):
         return True
 
-    def check_channel_pty_request(self, c, t, w, h, p, ph, m):
-        return True
+    # def check_channel_pty_request(self, _):
+    #     return True
 
 
 def handle_client(client, addr, host_key, account_manager):
@@ -140,16 +140,12 @@ def listener():
 
 
 if __name__ == "__main__":
-    import sys
-    import logging
 
     logging.basicConfig(level=logging.INFO)
-    host_key = paramiko.RSAKey.generate(
-        2048
-    )  # Replace with a valid key file for production
+    host_key = paramiko.RSAKey.generate(2048)
 
     try:
         listener()
     except Exception as e:
-        logging.error(f"Unhandled error: {e}")
+        logging.error("Unhandled error: %s", e)
         sys.exit(1)

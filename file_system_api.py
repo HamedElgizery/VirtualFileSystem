@@ -80,6 +80,16 @@ class FileSystemApi:
         )
         return cls(user_id, file_system=file_system)
 
+    @classmethod
+    def file_system_exists(cls, user_id: str) -> bool:
+        """
+        Checks if a file system exists.
+
+        :param user_id: The user ID.
+        :return: True if the file system exists, False otherwise.
+        """
+        return os.path.exists(f"{FileSystemApi.FS_PATH}/{user_id}.disk")
+
     # Important Utility Functions.
 
     def normalize_path(self, path: str) -> str:
@@ -191,6 +201,9 @@ class FileSystemApi:
         :param file_path: The path where the new file will be created.
         :param file_data: The data to be written to the new file.
         """
+        if type(file_data) is not bytes:
+            raise ValueError("new_data must be of type bytes")
+
         resolved_path = self.resolve_path(file_path)
         self.file_system.create_file(resolved_path, file_data)
         self.logger.info(
@@ -224,6 +237,9 @@ class FileSystemApi:
         if self.is_directory(file_path):
             raise ValueError(f"The path '{file_path}' is a directory.")
 
+        if type(new_data) is not bytes:
+            raise ValueError("new_data must be of type bytes")
+
         resolved_path = self.resolve_path(file_path)
         self.file_system.edit_file(resolved_path, new_data)
         self.logger.info(
@@ -236,10 +252,11 @@ class FileSystemApi:
 
         :param file_path: The path of the file to be deleted.
         """
-        if self.is_directory(file_path):
-            raise ValueError(f"The path '{file_path}' is a directory.")
-
         resolved_path = self.resolve_path(file_path)
+
+        if self.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_path}' is a directory.")
+
         self.file_system.delete_file(resolved_path)
         self.logger.info(f"Deleted {resolved_path}")
 
@@ -261,8 +278,14 @@ class FileSystemApi:
         :param file_path: The current path of the file to be moved.
         :param new_path: The new path where the file will be moved.
         """
+        resolved_path = self.resolve_path(file_path)
+        resolved_output_path = self.resolve_path(new_path)
+        resolved_output_path = self.normalize_path(
+            os.path.join(resolved_output_path, os.path.basename(file_path))
+        )
+
+        self.file_system.move_file(resolved_path, resolved_output_path)
         self.logger.info(f"Moving {file_path} to {new_path}")
-        self.file_system.move_file(file_path, new_path)
 
     def copy_file(self, file_path: str, copy_path: str) -> None:
         """
@@ -277,6 +300,9 @@ class FileSystemApi:
         resolved_output_path = self.normalize_path(
             os.path.join(resolved_output_path, os.path.basename(file_path))
         )
+
+        if self.is_directory(resolved_output_path) or self.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_output_path}' is a directory.")
 
         self.file_system.copy_file(resolved_path, resolved_output_path)
         self.logger.info(f"Copied {resolved_path} to {resolved_output_path}")
@@ -339,6 +365,10 @@ class FileSystemApi:
         :return: A list of the contents of the given directory.
         """
         resolved_path = self.resolve_path(dir_path)
+
+        if not self.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_path}' is not a directory.")
+
         files = self.file_system.list_directory_contents(resolved_path)
         return files
 
@@ -349,6 +379,10 @@ class FileSystemApi:
         :param dir_path: The path of the directory to delete.
         """
         resolved_path = self.resolve_path(dir_path)
+
+        if not self.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_path}' is not a directory.")
+
         self.file_system.delete_directory(resolved_path)
 
     def rename_directory(self, dir_path: str, new_name: str) -> None:
@@ -368,7 +402,12 @@ class FileSystemApi:
         :param dir_path: The current path of the directory to be moved.
         :param new_path: The new path where the directory will be moved.
         """
-        self.file_system.move_file(dir_path, new_path)
+        resolved_path = self.resolve_path(dir_path)
+        resolved_output_path = self.resolve_path(new_path)
+        resolved_output_path = self.normalize_path(
+            os.path.join(resolved_output_path, os.path.basename(new_path))
+        )
+        self.file_system.move_file(resolved_path, resolved_output_path)
 
     def copy_directory(self, dir_path: str, copy_path: str) -> None:
         """
@@ -383,6 +422,9 @@ class FileSystemApi:
         resolved_output_path = self.normalize_path(
             os.path.join(resolved_output_path, os.path.basename(dir_path))
         )
+
+        if self.is_directory(resolved_output_path) or self.is_directory(resolved_path):
+            raise ValueError(f"The path '{resolved_output_path}' is a directory.")
 
         self.file_system.copy_directory(resolved_path, resolved_output_path)
 
