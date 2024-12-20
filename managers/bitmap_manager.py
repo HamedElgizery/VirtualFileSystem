@@ -75,3 +75,6 @@ class BitmapManager:
             raise Exception("No continuous free space available.")
 
         return free_blocks
+
+    def get_free_blocks_count(self):
+        return self.bitmap.count(0) * 8

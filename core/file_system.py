@@ -691,6 +691,11 @@ class FileSystem:
         )
         self.fs.write(b"\0")
 
+    def get_free_space(self) -> int:
+        return (
+            self.config_manager.block_size * self.bitmap_manager.get_free_blocks_count()
+        )
+
     def list_all_files(self) -> List[FileIndexNode]:
         return list(self.index_manager.index.values())
 

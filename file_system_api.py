@@ -495,7 +495,15 @@ class FileSystemApi:
 
         :return: The total amount of free space in the filesystem in bytes.
         """
-        pass
+        return self.file_system.get_free_space()
+
+    def get_total_space(self) -> int:
+        """
+        Returns the total amount of space in the filesystem in bytes.
+
+        :return: The total amount of space in the filesystem in bytes.
+        """
+        return self.file_system.config_manager.file_system_size
 
     def get_fragementation_precentage(self) -> float:
         """

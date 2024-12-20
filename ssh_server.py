@@ -10,7 +10,7 @@ import threading
 
 import paramiko
 
-from ssh.ssh_cmd_handler import ModularShell
+from ssh_cmd_handler import ModularShell
 from ssh.account_manager import (
     AccountManager,
 )
@@ -34,6 +34,10 @@ def get_or_create_rsa_key(key_path: str) -> paramiko.RSAKey:
         print("New RSA key successfully generated and saved.")
 
     return key
+
+
+get_or_create_rsa_key(KEY_PATH)
+host_key = paramiko.RSAKey(filename=KEY_PATH)
 
 
 class Server(paramiko.ServerInterface):
@@ -113,7 +117,7 @@ def handle_client(client, addr, host_key, account_manager):
         client.close()
 
 
-def listener(host_key: str):
+def listener():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("", 2222))
@@ -141,13 +145,11 @@ def listener(host_key: str):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    get_or_create_rsa_key(KEY_PATH)
-    host_key = paramiko.RSAKey(filename=KEY_PATH)
 
     # host_key = paramiko.RSAKey.generate(2048)
 
     try:
-        listener(host_key)
+        listener()
     except Exception as e:
         logging.error("Unhandled error: %s", e)
         sys.exit(1)
