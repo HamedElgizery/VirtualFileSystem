@@ -227,7 +227,13 @@ class MainGUI:
         if item_values and item_values[2] != "Directory":
             self._open_file(item_values[0])
         elif item_values:
+
             self._navigate_to_directory(item_values[0])
+
+    def _navigate_to_directory(self, directory):
+
+        self.client.change_directory(directory)
+        self.load_directory(self.client.current_directory)
 
     def _open_file(self, file_name):
         file_path = os.path.join(self.client.current_directory, file_name)
@@ -339,12 +345,14 @@ class MainGUI:
     def go_back(self):
         if self.history_index > 0:
             self.history_index -= 1
-            self.load_directory(self.history[self.history_index])
+            self.client.change_directory(self.history[self.history_index])
+            self.load_directory(self.client.current_directory)
 
     def go_forward(self):
         if self.history_index < len(self.history) - 1:
             self.history_index += 1
-            self.load_directory(self.history[self.history_index])
+            self.client.change_directory(self.history[self.history_index])
+            self.load_directory(self.client.current_directory)
 
     def navigate_to_address(self):
         path = self.address_bar.get()

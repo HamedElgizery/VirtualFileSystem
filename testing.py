@@ -12,7 +12,7 @@ from file_system_api import FileSystemApi, FileMetadata
 @pytest.fixture
 def file_system_api():
     """Initialize the FileSystemApi with a real file system."""
-    user_id = str(uuid.uuid4())
+    user_id = "test_user"
     if FileSystemApi.file_system_exists(user_id):
         os.remove(f"{FileSystemApi.FS_PATH}/test_user.disk")
         os.remove(f"{FileSystemApi.FS_PATH}/test_user.disk.dt")
