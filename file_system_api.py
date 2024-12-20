@@ -1,3 +1,7 @@
+"""
+Simple API to interact with the file system
+"""
+
 import logging
 import os
 import datetime

@@ -1,19 +1,6 @@
-# This class is a modified version of the Cmd class in the cmd module
-# It has been modified to allow for basic line editing using the arrow keys
-# The line editing is quite basic and does not support things like
-# deleting characters or moving the cursor to a different position in the line
-# It just remembers the last 10 commands and allows you to recall them by pressing the up arrow
-# The down arrow will move down the list of previous commands
-
 """
-This module provides a modified version of the Cmd class in the cmd module
-It has been modified to allow for basic line editing using the arrow keys
-The line editing is quite basic and does not support things like
-deleting characters or moving the cursor to a different position in the line
-It just remembers the last 10 commands and allows you to recall them by pressing the up arrow
-The down arrow will move down the list of previous commands
+This module provides a modified version of the Cmd class in the cmd module meant for ssh
 """
-
 
 import sys
 from cmd_handler import ModularShell
@@ -24,11 +11,11 @@ class SshModularShell(ModularShell):
     This class is a modified version of the Cmd class in the cmd module
     """
 
-    def default(self, line):
+    def default(self, line) -> None:
         """Prints an error message if the user enters a command that is not recognized"""
         self.printline(f"*** Unknown syntax: {line}")
 
-    def cmdloop(self, intro=None):
+    def cmdloop(self, intro=None) -> None:
         """
         This method is the main loop of the command shell.
         It will keep reading commands from the user
@@ -47,14 +34,13 @@ class SshModularShell(ModularShell):
                 if not char:  # End of input
                     break
 
-                # Handle Enter key
                 if char in ("\r", "\n"):
-                    self.print("\r\n")  # Echo newline
-                    if buffer.strip():  # Execute command if not empty
-                        if self.onecmd(buffer.strip()):  # Exit the shell on 'exit'
+                    self.print("\r\n")
+                    if buffer.strip():
+                        if self.onecmd(buffer.strip()):
                             break
-                    buffer = ""  # Reset buffer
-                    self.print(self.prompt)  # Reprint the prompt
+                    buffer = ""
+                    self.print(self.prompt)
                     continue
 
                 # Handle Backspace
@@ -64,8 +50,6 @@ class SshModularShell(ModularShell):
                         self.print("\b \b")
                     continue
 
-                # Handle up and down arrow keys
-
                 if char == "\x1b":
                     try:
                         next_char = self.stdin.read(2).decode("utf-8")
@@ -73,12 +57,12 @@ class SshModularShell(ModularShell):
                         continue
 
                     char += next_char
-                    if char == "\x1b[A":  # Up arrow
+                    if char == "\x1b[A":
                         if self.cmdqueue:
                             buffer = self.cmdqueue.pop(0)
                             self.print(f"\r{buffer}\r")
                         continue
-                    if char == "\x1b[B":  # Down arrow
+                    if char == "\x1b[B":
                         if self.cmdqueue:
                             buffer = self.cmdqueue.pop(0)
                             self.print(f"\r{buffer}\r")
@@ -98,4 +82,5 @@ class SshModularShell(ModularShell):
 
 
 if __name__ == "__main__":
+    # for testing
     SshModularShell("waryoyo").cmdloop()

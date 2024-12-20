@@ -1,3 +1,7 @@
+"""
+Basic shell to interact with file system
+"""
+
 from cmd import Cmd
 from os import path
 from importlib import import_module

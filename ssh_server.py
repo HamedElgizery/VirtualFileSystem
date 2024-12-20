@@ -1,3 +1,7 @@
+"""
+SSH Server
+"""
+
 import logging
 import os
 import socket
@@ -16,7 +20,7 @@ logging.basicConfig()
 logger = logging.getLogger()
 
 
-def get_or_create_rsa_key(key_path):
+def get_or_create_rsa_key(key_path: str) -> paramiko.RSAKey:
     # Check if the key file already exists
     if os.path.exists(key_path):
         print(f"Key file exists. Loading from {key_path}...")
@@ -30,10 +34,6 @@ def get_or_create_rsa_key(key_path):
         print("New RSA key successfully generated and saved.")
 
     return key
-
-
-get_or_create_rsa_key(KEY_PATH)
-host_key = paramiko.RSAKey(filename=KEY_PATH)
 
 
 class Server(paramiko.ServerInterface):
@@ -113,7 +113,7 @@ def handle_client(client, addr, host_key, account_manager):
         client.close()
 
 
-def listener():
+def listener(host_key: str):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.bind(("", 2222))
@@ -139,13 +139,19 @@ def listener():
             print(f"Error in listener: {e}")
 
 
-if __name__ == "__main__":
-
+def main():
     logging.basicConfig(level=logging.INFO)
-    host_key = paramiko.RSAKey.generate(2048)
+    get_or_create_rsa_key(KEY_PATH)
+    host_key = paramiko.RSAKey(filename=KEY_PATH)
+
+    # host_key = paramiko.RSAKey.generate(2048)
 
     try:
-        listener()
+        listener(host_key)
     except Exception as e:
         logging.error("Unhandled error: %s", e)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
