@@ -545,6 +545,13 @@ class FileSystem:
             )
 
             local_transcation_manager.add_operation(
+                dir_node.remove_child,
+                rollback_func=dir_node.add_child,
+                func_args=[self, child.file_name],
+                rollback_args=[self, child],
+            )
+            
+            local_transcation_manager.add_operation(
                 self.index_manager.delete_from_index,
                 rollback_func=self.index_manager.write_to_index,
                 func_args=[child],
