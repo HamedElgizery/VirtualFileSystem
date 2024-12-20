@@ -629,6 +629,20 @@ class FileSystem:
             rollback_args=[self, file_node],
         )
 
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[target_node],
+            rollback_args=[target_node],
+        )
+
         self.transaction_manager.commit()
 
         # parent_node.remove_child(self, file_node.file_name)
