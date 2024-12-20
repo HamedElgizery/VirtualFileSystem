@@ -7,18 +7,17 @@ if TYPE_CHECKING:
 
 class DefragCommand(BaseCommand):
     """
-    Simulates the behavior of the 'mkdir' command to create a directory.
-
-    Usage:
-      mkdir <directory_name>
+    Defragments the disk
     """
 
     name = "defrag"
-    description = "Creates a directory."
+    description = "Fragments the disk"
     arguments = []
 
     def execute(self, args: List[str], fs: "FileSystemApi") -> str:
-        print("Before: " + str(fs.get_fragmentation_percentage()))
+        output = ""
+        output += "Before: " + str(fs.get_fragmentation_percentage()) + "\n"
         fs.defragmentation()
-        print("After: " + str(fs.get_fragmentation_percentage()))
-        return "Defragmentation done succesfully!"
+        output += "After: " + str(fs.get_fragmentation_percentage()) + "\n"
+        output += "Defragmentation done succesfully!"
+        return output

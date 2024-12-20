@@ -750,6 +750,7 @@ class FileSystem:
         for node in file_nodes:
             file_data = self.read_file(node)
             node.file_start_block = next_block_idx
+            self.index_manager.write_to_index(node)
             self.fs.seek(
                 self.config_manager.bitmap_size
                 + self.config_manager.file_index_size
@@ -757,10 +758,11 @@ class FileSystem:
             )
             next_block_idx += node.file_blocks
             self.fs.write(
-                file_data.ljust(node.file_blocks * self.config_manager.block_size, b"\0")
+                file_data.ljust(
+                    node.file_blocks * self.config_manager.block_size, b"\0"
+                )
             )
             self.fs.flush()
-
 
     def clear_block_data(self, block_number: int) -> None:
         self.fs.seek(block_number * self.config_manager.block_size)
