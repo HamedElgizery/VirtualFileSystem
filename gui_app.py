@@ -6,14 +6,25 @@ from file_system_api import FileSystemApi
 import tkinter.filedialog as fd
 
 
+def set_window_to_center(root):
+    root.update_idletasks()
+    width = root.winfo_width()
+    height = root.winfo_height()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+    root.geometry(f"{width}x{height}+{x}+{y}")
+
+
 class ConnectionWindow:
     """Handles the connection interface for the user."""
 
     def __init__(self, root):
         self.root = root
         self.root.title("GUI Client")
-
         self._initialize_widgets()
+        set_window_to_center(self.root)
 
     def _initialize_widgets(self):
         tk.Label(self.root, text="Username:").grid(row=0, column=0, padx=5, pady=5)
@@ -57,6 +68,7 @@ class MainGUI:
         self._initialize_treeview()
         self._initialize_context_menus()
         self._initialize_right_click_menu()
+        set_window_to_center(self.root)
 
         self.tree.drop_target_register(DND_FILES)
         self.tree.dnd_bind("<<Drop>>", self.on_file_drop)
@@ -236,16 +248,21 @@ class MainGUI:
         self.load_directory(self.client.current_directory)
 
     def _open_file(self, file_name):
-        file_path = os.path.join(self.client.current_directory, file_name)
+        file_path = self.client.normalize_path(
+            os.path.join(self.client.current_directory, file_name)
+        )
         self._create_file_window(file_path)
 
     def _create_file_window(self, file_path):
         file_window = tk.Toplevel(self.root)
+
         file_window.title(file_path)
         text = tk.Text(file_window, width=40, height=10)
         text.pack(fill=tk.BOTH, expand=True)
 
         text.insert(tk.END, self.client.read_file(file_path).decode())
+        set_window_to_center(file_window)
+
         file_window.protocol(
             "WM_DELETE_WINDOW",
             lambda: self._close_file_window(file_window, text, file_path),
