@@ -2,12 +2,14 @@
 This is the gui of the file system, it connects using username.
 """
 
+import io
 import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import Canvas, ttk, messagebox
 import tkinter.filedialog as fd
 from typing import Callable, List, Optional
 from tkinterdnd2 import TkinterDnD, DND_FILES
+from PIL import Image, ImageTk
 from file_system_api import FileSystemApi
 
 
@@ -302,7 +304,12 @@ class MainGUI:
         file_path = self.client.normalize_path(
             os.path.join(self.client.current_directory, file_name)
         )
-        self._create_file_window(file_path)
+        _, file_extension = os.path.splitext(file_name)
+
+        if file_extension in [".jpg", ".png", ".jpeg"]:
+            self._create_image_window(file_path)
+        else:
+            self._create_file_window(file_path)
 
     def _create_file_window(self, file_path: str) -> None:
         file_window = tk.Toplevel(self.root)
@@ -539,6 +546,25 @@ class MainGUI:
         """
         if not self.tree.identify_row(event.y):
             self.menu.post(event.x_root, event.y_root)
+
+    def _create_image_window(self, file_path: str) -> None:
+        """
+        Create a Tkinter window and display an image from bytes.
+
+        :param image_bytes: The image data in bytes format.
+        """
+        image_bytes = self.client.read_file(file_path)
+
+        window = tk.Toplevel(self.root)
+        window.title("Image Viewer")
+
+        image = Image.open(io.BytesIO(image_bytes))
+
+        tk_image = ImageTk.PhotoImage(image)
+        panel = tk.Label(window, image=tk_image)
+        panel.image = tk_image
+        panel.pack()
+        window.mainloop()
 
 
 if __name__ == "__main__":
