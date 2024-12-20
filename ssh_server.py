@@ -10,7 +10,7 @@ import threading
 
 import paramiko
 
-from ssh_cmd_handler import ModularShell
+from ssh.ssh_cmd_handler import ModularShell
 from ssh.account_manager import (
     AccountManager,
 )
