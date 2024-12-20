@@ -203,6 +203,7 @@ class FileSystem:
             + self.config_manager.file_index_size
             + file_start_block_index * self.config_manager.block_size
         )
+
         self.fs.seek(start_position)
         self.fs.write(
             file_data.ljust(num_blocks_needed * self.config_manager.block_size, b"\0")
@@ -742,13 +743,24 @@ class FileSystem:
 
     # TODO: do this shit tomorrow
     def defragmentation(self):
-
         file_nodes = sorted(
             self.index_manager.index.values(), key=lambda node: node.file_start_block
         )
-
+        next_block_idx = 0
         for node in file_nodes:
-            pass
+            file_data = self.read_file(node)
+            node.file_start_block = next_block_idx
+            self.fs.seek(
+                self.config_manager.bitmap_size
+                + self.config_manager.file_index_size
+                + next_block_idx * self.config_manager.block_size
+            )
+            next_block_idx += node.file_blocks
+            self.fs.write(
+                file_data.ljust(node.file_blocks * self.config_manager.block_size, b"\0")
+            )
+            self.fs.flush()
+
 
     def clear_block_data(self, block_number: int) -> None:
         self.fs.seek(block_number * self.config_manager.block_size)

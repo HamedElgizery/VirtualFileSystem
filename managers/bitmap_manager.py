@@ -52,7 +52,8 @@ class BitmapManager:
         free_blocks = []
         start_index = -1
         count = 0
-
+        # Blocks info are stored as a bit in the bytes
+        # Each byte has 8 blocks
         for i in range(self.num_blocks):
             byte_index = i // 8
             bit_index = i % 8

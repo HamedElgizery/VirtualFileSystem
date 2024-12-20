@@ -108,3 +108,4 @@ class IndexManager:
         )
         self.fs.write(b"\0" * self.config_manager.index_entry_size)
         self.fs.flush()
+        del self.index_locations[file_index.id]

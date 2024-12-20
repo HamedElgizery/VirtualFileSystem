@@ -12,7 +12,7 @@ from core.file_system import FileSystem
 from structs.metadata import Metadata
 
 
-@dataclass(kw_only=True)
+@dataclass
 class FileMetadata:
     file_name: str
     file_path: str
@@ -505,17 +505,18 @@ class FileSystemApi:
         """
         return self.file_system.config_manager.file_system_size
 
-    def get_fragementation_precentage(self) -> float:
+    def get_fragmentation_percentage(self) -> float:
         """
         Calculates the percentage of free space that is fragmented.
 
         :return: The percentage of free space that is fragmented.
         """
-        return self.get_fragementation_precentage()
+        return self.file_system.calculate_fragmentation()
 
     def defragmentation(self) -> None:
         """
         Defragments the filesystem. This is a blocking operation and will take a
         long time for large filesystems.
         """
-        pass
+        self.file_system.defragmentation()
+
