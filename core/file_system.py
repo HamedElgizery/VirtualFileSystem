@@ -278,7 +278,6 @@ class FileSystem:
 
         return b"".join(data).rstrip(b"\x00")
 
-    # TODO: add transcation manager here
     def edit_file(self, file_dir: str, new_data: bytes):
 
         file_node = self.resolve_path(file_dir)
@@ -288,21 +287,47 @@ class FileSystem:
         if file_node.is_directory:
             raise ValueError("The specified path is a directory.")
 
-        max_data_size = file_node.file_blocks * self.config_manager.block_size
         new_data_blocks = math.ceil(len(new_data) / self.config_manager.block_size)
         factor = math.ceil(new_data_blocks / file_node.file_blocks)
         if factor >= 2:
-            self.realign(file_node, factor)
+            # self.realign(file_node, factor)
+
+            self.transaction_manager.add_operation(
+                func=self.realign,
+                rollback_func=self.realign,
+                func_args=[file_node, factor],
+                rollback_args=[file_node, 1 / factor],
+            )
 
         start_position = (
             self.config_manager.bitmap_size
             + self.config_manager.file_index_size
             + file_node.file_start_block * self.config_manager.block_size
         )
-        self.fs.seek(start_position)
-        self.fs.write(
-            new_data.ljust(new_data_blocks * self.config_manager.block_size, b"\0")
+        self.transaction_manager.add_operation(
+            func=self.fs.seek,
+            rollback_func=self.fs.seek,
+            func_args=[start_position],
+            rollback_args=[start_position],
         )
+
+        self.transaction_manager.add_operation(
+            func=self.fs.write,
+            rollback_func=self.fs.write,
+            func_args=[
+                new_data.ljust(new_data_blocks * self.config_manager.block_size, b"\0")
+            ],
+            rollback_args=[
+                b"".join(
+                    [
+                        self.fs.read(self.config_manager.block_size)
+                        for _ in range(file_node.file_blocks)
+                    ]
+                ).rstrip(b"\0")
+            ],
+        )
+
+        self.transaction_manager.commit()
 
     def delete_file(self, file_dir: str) -> None:
         parent_node, file_node = self.resolve_path(file_dir, True)
@@ -339,6 +364,79 @@ class FileSystem:
         )
 
         self.transaction_manager.commit()
+
+    def rename_file(self, old_dir: str, new_name: str) -> None:
+        file_node = self.resolve_path(old_dir)
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        file_node.file_name = new_name
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[file_node],
+            rollback_args=[file_node],
+        )
+        self.transaction_manager.commit()
+
+    def copy_file(self, old_dir: str, new_dir: str) -> None:
+        file_node = self.resolve_path(old_dir)
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        self.create_file(new_dir, self.read_file(old_dir))
+
+    def move_file(self, old_dir: str, new_dir: str) -> None:
+        parent_node, file_node = self.resolve_path(old_dir, True)
+        target_node = self.resolve_path("/".join(new_dir.split("/")[:-1]) or "/")
+        if not file_node:
+            raise FileNotFoundError(f"File '{old_dir}' not found.")
+
+        if not target_node:
+            raise Exception(f"Target directory '{new_dir}' not found.")
+
+        if not target_node.is_directory:
+            raise FileNotFoundError(f"{file_node} is not a directory.")
+
+        if file_node.file_name in target_node.load_children(self):
+            raise Exception(
+                f"File '{file_node.file_name}' already exists in '{new_dir}'."
+            )
+
+        self.transaction_manager.add_operation(
+            parent_node.remove_child,
+            rollback_func=parent_node.add_child,
+            func_args=[self, file_node.file_name],
+            rollback_args=[self, file_node],
+        )
+
+        self.transaction_manager.add_operation(
+            target_node.add_child,
+            rollback_func=target_node.remove_child,
+            func_args=[self, file_node],
+            rollback_args=[self, file_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[parent_node],
+            rollback_args=[parent_node],
+        )
+
+        self.transaction_manager.add_operation(
+            self.index_manager.write_to_index,
+            rollback_func=self.index_manager.delete_from_index,
+            func_args=[target_node],
+            rollback_args=[target_node],
+        )
+
+        self.transaction_manager.commit()
+
+    def get_file_size(self, file_dir: str) -> int:
+        file_node = self.resolve_path(file_dir)
+        return file_node.file_blocks * self.config_manager.block_size
 
     """
     Directory Operations
@@ -498,12 +596,30 @@ class FileSystem:
                 f"{dir_path}/{child.file_name}", f"{new_dir_path}/{child.file_name}"
             )
 
+    def get_directory_size(self, dir_path: str) -> int:
+        dir_node = self.resolve_path(dir_path)
+
+        if not dir_node:
+            raise ValueError("Directory doesn't exist")
+
+        if not dir_node.is_directory:
+            raise ValueError("Not a directory")
+
+        size_sum = 0
+        for child in dir_node.load_children(self):
+            if child.is_directory:
+                size_sum += self.get_directory_size(f"{dir_path}/{child.file_name}")
+            else:
+                size_sum += child.file_blocks * self.config_manager.block_size
+
+        return size_sum
+
     """
     Other Operations.
     """
 
     # TODO: add a method which will also automically copy all the older blocks and expand
-    def realign(self, file_index: FileIndexNode, factor: int = 2) -> None:
+    def realign(self, file_index: FileIndexNode, factor: Union[int, float] = 2) -> None:
         if file_index.is_directory:
             children = file_index.load_children(self)
             self.bitmap_manager.free_blocks(
@@ -511,7 +627,7 @@ class FileSystem:
             )
 
             free_blocks = self.bitmap_manager.find_free_space_bitmap(
-                file_index.file_blocks * factor
+                int(math.ceil(file_index.file_blocks * factor))
             )
             start_block = free_blocks[0]
 
@@ -538,7 +654,7 @@ class FileSystem:
             )
 
             free_blocks = self.bitmap_manager.find_free_space_bitmap(
-                file_index.file_blocks * factor
+                int(math.ceil(file_index.file_blocks * factor))
             )
             start_block = free_blocks[0]
 
@@ -571,85 +687,12 @@ class FileSystem:
     def list_all_files(self) -> List[FileIndexNode]:
         return list(self.index_manager.index.values())
 
-    def get_file_size(self, file_dir: str) -> int:
-        file_node = self.resolve_path(file_dir)
-        return file_node.file_blocks * self.config_manager.block_size
-
     def find_file_by_name(self, file_name: str) -> Optional[FileIndexNode]:
         for file_index in self.index_manager.index.values():
             if file_index.file_name == file_name:
                 return file_index
 
         return None
-
-    def rename_file(self, old_dir: str, new_name: str) -> None:
-        file_node = self.resolve_path(old_dir)
-        if not file_node:
-            raise FileNotFoundError(f"File '{old_dir}' not found.")
-
-        file_node.file_name = new_name
-
-        self.index_manager.write_to_index(file_node)
-
-    def copy_file(self, old_dir: str, new_dir: str) -> None:
-        file_node = self.resolve_path(old_dir)
-        if not file_node:
-            raise FileNotFoundError(f"File '{old_dir}' not found.")
-
-        self.create_file(new_dir, self.read_file(old_dir))
-
-    def move_file(self, old_dir: str, new_dir: str) -> None:
-        parent_node, file_node = self.resolve_path(old_dir, True)
-        target_node = self.resolve_path("/".join(new_dir.split("/")[:-1]) or "/")
-        if not file_node:
-            raise FileNotFoundError(f"File '{old_dir}' not found.")
-
-        if not target_node:
-            raise Exception(f"Target directory '{new_dir}' not found.")
-
-        if not target_node.is_directory:
-            raise FileNotFoundError(f"{file_node} is not a directory.")
-
-        if file_node.file_name in target_node.load_children(self):
-            raise Exception(
-                f"File '{file_node.file_name}' already exists in '{new_dir}'."
-            )
-
-        self.transaction_manager.add_operation(
-            parent_node.remove_child,
-            rollback_func=parent_node.add_child,
-            func_args=[self, file_node.file_name],
-            rollback_args=[self, file_node],
-        )
-
-        self.transaction_manager.add_operation(
-            target_node.add_child,
-            rollback_func=target_node.remove_child,
-            func_args=[self, file_node],
-            rollback_args=[self, file_node],
-        )
-
-        self.transaction_manager.add_operation(
-            self.index_manager.write_to_index,
-            rollback_func=self.index_manager.delete_from_index,
-            func_args=[parent_node],
-            rollback_args=[parent_node],
-        )
-
-        self.transaction_manager.add_operation(
-            self.index_manager.write_to_index,
-            rollback_func=self.index_manager.delete_from_index,
-            func_args=[target_node],
-            rollback_args=[target_node],
-        )
-
-        self.transaction_manager.commit()
-
-        # parent_node.remove_child(self, file_node.file_name)
-        # target_node.add_child(self, file_node)
-
-        # self.copy_file(old_dir, new_dir)
-        # self.delete_file(old_dir)
 
     def calculate_fragmentation(self):
         # Sort the file nodes by start block
