@@ -8,6 +8,7 @@ from importlib import import_module
 from glob import glob
 from typing import List
 import uuid
+import argparse
 
 from file_system_api import FileSystemApi
 from structs.base_command import BaseCommand
@@ -143,4 +144,15 @@ class ModularShell(Cmd):
 
 
 if __name__ == "__main__":
-    ModularShell("waryoyo").cmdloop()
+
+    parser = argparse.ArgumentParser(description="Process a user_id.")
+    parser.add_argument(
+        "user_id",
+        type=str,
+        help="The user ID to process.",
+        nargs="?",
+        default="waryoyo",
+    )
+    args = parser.parse_args()
+    print("logging in as", args.user_id)
+    ModularShell(args.user_id).cmdloop()
