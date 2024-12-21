@@ -11,6 +11,7 @@ from typing import Callable, List, Optional
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from PIL import Image, ImageTk
 from file_system_api import FileSystemApi
+from tcp_client import FileSystemClient
 
 
 def set_window_to_center(root: tk.Tk) -> None:
@@ -69,16 +70,17 @@ class ConnectionWindow:
         except Exception as e:
             messagebox.showerror("Connection Error", f"Failed to connect: {str(e)}")
 
-    def _get_client(self, username: str) -> "FileSystemApi":
-        if FileSystemApi.file_system_exists(username):
-            return FileSystemApi(username)
-        return FileSystemApi.create_new_file_system(username)
+    def _get_client(self, username: str) -> "FileSystemClient":
+        return FileSystemClient("localhost", 65432, username)
+        # if FileSystemApi.file_system_exists(username):
+        #     return FileSystemApi(username)
+        # return FileSystemApi.create_new_file_system(username)
 
 
 class MainGUI:
     """Manages the main GUI for file exploration."""
 
-    def __init__(self, client: "FileSystemApi") -> None:
+    def __init__(self, client: "FileSystemClient") -> None:
         self.client = client
         self.history: List[str] = []
         self.history_index = -1
