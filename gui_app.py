@@ -151,6 +151,7 @@ class MainGUI:
         self.tree.bind("<Control-c>", lambda _: self.copy())
         self.tree.bind("<Control-x>", lambda _: self.move())
         self.tree.bind("<Control-v>", lambda _: self.paste_buffer())
+        self.tree.bind("<Delete>", lambda _: self.delete())
 
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
