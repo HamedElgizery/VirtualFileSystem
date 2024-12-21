@@ -47,6 +47,7 @@ class ConnectionWindow:
         tk.Label(self.root, text="Username:").grid(row=0, column=0, padx=5, pady=5)
 
         self.username_entry = tk.Entry(self.root)
+        self.username_entry.bind("<Return>", lambda event: self.connect())
         self.username_entry.grid(row=0, column=1, padx=5, pady=5)
 
         tk.Button(self.root, text="Connect", command=self.connect).grid(

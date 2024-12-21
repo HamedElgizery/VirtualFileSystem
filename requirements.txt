@@ -1,3 +1,4 @@
 paramiko
 tkinterdnd2
 pytest
+pillow
