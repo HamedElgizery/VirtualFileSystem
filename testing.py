@@ -1,14 +1,9 @@
 """pytest  module"""
 
 import os
-import shutil
 import uuid
 import pytest
-from unittest.mock import MagicMock
-from datetime import datetime
-from core.file_system import FileSystem
-from structs.metadata import Metadata
-from file_system_api import FileSystemApi, FileMetadata
+from file_system_api import FileSystemApi
 
 
 @pytest.fixture
