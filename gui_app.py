@@ -420,7 +420,6 @@ class MainGUI:
         """
         window = tk.Toplevel(self.root)
         window.title(title)
-
         tk.Label(window, text=label_text).grid(row=0, column=0, padx=5, pady=5)
 
         entry = tk.Entry(window)
@@ -431,6 +430,7 @@ class MainGUI:
             text="Create",
             command=lambda: self._execute_callback(callback, entry, window),
         ).grid(row=1, column=0, columnspan=2, pady=5)
+        set_window_to_center(window)
 
     def _execute_callback(
         self, callback: Callable, entry: tk.Entry, window: tk.Tk
