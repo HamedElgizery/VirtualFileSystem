@@ -29,6 +29,16 @@ def set_window_to_center(root: tk.Tk) -> None:
     root.geometry(f"{width}x{height}+{x}+{y}")
 
 
+def is_command_in_menu(menu, command_name):
+    try:
+        for i in range(menu.index("end") + 1):  # Iterate over all menu items
+            if menu.entrycget(i, "label") == command_name:
+                return True
+    except:
+        pass  # Safeguard against any errors (e.g., non-existent indexes)
+    return False
+
+
 class ConnectionWindow:
     """Handles the connection interface for the user."""
 
@@ -138,6 +148,10 @@ class MainGUI:
         self.tree.heading("Type", text="Type")
         self.tree.heading("Last Modified", text="Last Modified")
         self.tree.bind("<Double-1>", self.on_tree_click)
+        self.tree.bind("<Control-c>", lambda _: self.copy())
+        self.tree.bind("<Control-x>", lambda _: self.move())
+        self.tree.bind("<Control-v>", lambda _: self.paste_buffer())
+
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
     def _initialize_context_menus(self) -> None:
@@ -274,7 +288,8 @@ class MainGUI:
         item_values = self.tree.item(selected_item, "values")
         self.copy_buffer = self.client.resolve_path(item_values[0])
         self.copy_buffer_mode = mode
-        self.menu.add_command(label="Paste", command=self.paste_buffer)
+        if not is_command_in_menu(self.menu, "Paste"):
+            self.menu.add_command(label="Paste", command=self.paste_buffer)
 
     def delete(self) -> None:
         self._delete_item()

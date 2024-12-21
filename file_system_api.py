@@ -424,9 +424,6 @@ class FileSystemApi:
             os.path.join(resolved_output_path, os.path.basename(dir_path))
         )
 
-        if self.is_directory(resolved_output_path) or self.is_directory(resolved_path):
-            raise ValueError(f"The path '{resolved_output_path}' is a directory.")
-
         self.file_system.copy_directory(resolved_path, resolved_output_path)
 
     def get_directory_metadata(self, dir_path: str) -> "FileMetadata":
