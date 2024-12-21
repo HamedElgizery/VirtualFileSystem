@@ -21,8 +21,10 @@ class MvCommand(BaseCommand):
 
         if fs.is_directory(input_path) and fs.is_directory(target_path):
             fs.move_directory(input_path, target_path)
+            return "Moved directory successfully."
 
-        elif not fs.is_directory(input_path) and not fs.is_directory(target_path):
+        elif not fs.is_directory(input_path) and fs.is_directory(target_path):
             fs.move_file(input_path, target_path)
+            return "Moved file successfully."
 
-        return f"Directory '{input_path}' created successfully."
+        return "Error: Invalid arguments."

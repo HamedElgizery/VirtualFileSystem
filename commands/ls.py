@@ -28,10 +28,16 @@ class LsCommand(BaseCommand):
             if use_long_format:
                 for item in contents:
                     metadata = fs.get_file_metadata(os.path.join(path, item))
-                    output += f"{item} {metadata.file_size} {metadata.modification_date} {metadata.is_directory}\n"
+                    if fs.is_directory(os.path.join(path, item)):
+                        output += f"\033[94m{item}\033[0m {metadata.file_size} {metadata.modification_date} {metadata.is_directory}\n"
+                    else:
+                        output += f"{item} {metadata.file_size} {metadata.modification_date} {metadata.is_directory}\n"
             else:
                 for item in contents:
-                    output += f"{item}\n"
+                    if fs.is_directory(os.path.join(path, item)):
+                        output += f"\033[94m{item}\033[0m\n"
+                    else:
+                        output += f"{item}\n"
         else:
             output += f"{path} is not a directory."
 
