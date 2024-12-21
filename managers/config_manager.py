@@ -1,8 +1,10 @@
 import math
 
+from structs.metadata import Metadata
+
 
 class ConfigManager:
-    def __init__(self, metadata):
+    def __init__(self, metadata: "Metadata"):
         """
         Initialize the configuration manager with dynamic settings derived from metadata.
 
@@ -23,7 +25,6 @@ class ConfigManager:
         self.index_entry_size = self._calculate_index_entry_size()
         self.max_index_entries = self.file_index_size // self.index_entry_size
         self.bitmap_size = self.num_blocks // 8
-        self.max_length_childrens = self.file_start_block_index_size
 
     def _calculate_max_file_blocks(self):
         return math.ceil(math.log2(self.num_blocks) / 8)
@@ -36,7 +37,7 @@ class ConfigManager:
             + self.file_start_block_index_size  # Start block index size
             + 1  # Is directory flag
             + self.max_length_children  # Max children size
-            + self.file_start_block_index_size  # Start block index for children
+            # + self.file_start_block_index_size  # Start block index for children
             + 4  # Creation date
             + 4  # Modification date
         )

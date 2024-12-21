@@ -58,6 +58,9 @@ class ConnectionWindow:
         Connecting to file system and creating new window
         """
         username = self.username_entry.get()
+        if username.strip() == "":
+            messagebox.showerror("Error", "Please enter a username.")
+            return
         try:
             client = self._get_client(username)
             self.root.destroy()

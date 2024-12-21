@@ -340,7 +340,7 @@ class FileSystem:
 
         self.transaction_manager.add_operation(
             self.bitmap_manager.free_blocks,
-            rollback_func=self.bitmap_manager.mark_used,
+            rollback_func=self.bitmap_manager.mark_blocks,
             func_args=[range(file_node.file_blocks), file_node.file_start_block],
             rollback_args=[range(file_node.file_blocks), file_node.file_start_block],
         )

@@ -38,8 +38,10 @@ class BitmapManager:
 
     def free_block(self, block_number: int) -> None:
         self.bitmap[block_number // 8] &= ~(1 << (block_number % 8))
-        self.fs.seek(block_number * self.block_size)
-        self.fs.write(b"\0" * self.block_size)
+        self.fs.seek(block_number // 8)
+        self.fs.write(bytes([self.bitmap[block_number % 8]]))
+        # self.fs.seek(block_number * self.block_size)
+        # self.fs.write(b"\0" * self.block_size)
 
     def free_blocks(self, blocks: Iterable[int], margin: Optional[int] = 0):
         if self.logger:

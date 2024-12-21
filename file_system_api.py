@@ -305,9 +305,6 @@ class FileSystemApi:
             os.path.join(resolved_output_path, os.path.basename(file_path))
         )
 
-        if self.is_directory(resolved_output_path) or self.is_directory(resolved_path):
-            raise ValueError(f"The path '{resolved_output_path}' is a directory.")
-
         self.file_system.copy_file(resolved_path, resolved_output_path)
         self.logger.info(f"Copied {resolved_path} to {resolved_output_path}")
 
@@ -519,4 +516,3 @@ class FileSystemApi:
         long time for large filesystems.
         """
         self.file_system.defragmentation()
-

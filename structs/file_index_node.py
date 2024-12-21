@@ -68,7 +68,7 @@ class FileIndexNode:
         file_name_size,
         max_file_blocks,
         file_start_block_index_size,
-        max_length_childrens,
+        max_length_children,
     ) -> bytes:
         id_bytes = self.id.to_bytes(4, byteorder="big")
         file_name_bytes = self.file_name.encode("utf-8").ljust(file_name_size, b"\0")
@@ -78,7 +78,7 @@ class FileIndexNode:
         )
         is_directory_byte = b"\1" if self.is_directory else b"\0"
         children_count_bytes = self.children_count.to_bytes(
-            max_length_childrens, byteorder="big"
+            max_length_children, byteorder="big"
         )
 
         creation_date = self.creation_date.to_bytes(4, byteorder="big")
@@ -123,9 +123,9 @@ class FileIndexNode:
 
         children_count_bytes = data[
             offset_pointer : offset_pointer
-            + file_system.config_manager.max_length_childrens
+            + file_system.config_manager.max_length_children
         ]
-        offset_pointer += file_system.config_manager.max_length_childrens
+        offset_pointer += file_system.config_manager.max_length_children
 
         creation_date_bytes = data[offset_pointer : offset_pointer + 4]
         offset_pointer += 4

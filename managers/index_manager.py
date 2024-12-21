@@ -48,7 +48,7 @@ class IndexManager:
                     self.config_manager.file_name_size,
                     self.config_manager.max_file_blocks,
                     self.config_manager.file_start_block_index_size,
-                    self.config_manager.max_length_childrens,
+                    self.config_manager.max_length_children,
                 )
             )
             return
@@ -74,12 +74,11 @@ class IndexManager:
                     self.config_manager.file_name_size,
                     self.config_manager.max_file_blocks,
                     self.config_manager.file_start_block_index_size,
-                    self.config_manager.max_length_childrens,
+                    self.config_manager.max_length_children,
                 )
             )
             # self.index[file_index.id] = file_index
             self.index_locations[file_index.id] = i
-            self.fs.flush()
             return
 
         raise Exception("No space in file index.")
@@ -106,6 +105,5 @@ class IndexManager:
             self.config_manager.bitmap_size
             + self.index_locations[file_index.id] * self.config_manager.index_entry_size
         )
-        self.fs.write(b"\0" * self.config_manager.index_entry_size)
-        self.fs.flush()
+        self.fs.write(b"\0".ljust(self.config_manager.index_entry_size, b"\0"))
         del self.index_locations[file_index.id]
