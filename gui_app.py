@@ -184,8 +184,10 @@ class MainGUI:
 
         :param file_path: The path of the dropped file.
         """
-        file_name = os.path.basename(file_path)
-        with open(file_path, "rb") as f:
+        clean_path = file_path.strip("{}")
+        file_name = os.path.basename(clean_path)
+        normalized_path = os.path.normpath(clean_path)
+        with open(normalized_path, "rb") as f:
             file_data = f.read()
 
         self.client.create_file(file_name, file_data)
