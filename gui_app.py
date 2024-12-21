@@ -29,7 +29,6 @@ def apply_syntax_highlighting(text_widget):
         "comment": r"#.*",  # Comments starting with #
         "class": r"\bclass\s+(\w+)",  # Class definitions
         "function": r"\bdef\s+(\w+)",  # Function definitions
-        "decorator": r"@\w+",  # Decorators
         "numeric": r"\b\d+(\.\d+)?\b",  # Numeric literals
     }
 
@@ -55,9 +54,6 @@ def apply_syntax_highlighting(text_widget):
     )
     text_widget.tag_config(
         "function", foreground="dark green", font=("Helvetica", 10, "bold")
-    )
-    text_widget.tag_config(
-        "decorator", foreground="red", font=("Helvetica", 10, "italic")
     )
     text_widget.tag_config("numeric", foreground="brown", font=("Helvetica", 10))
 
