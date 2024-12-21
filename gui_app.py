@@ -2,8 +2,11 @@
 This is the gui of the file system, it connects using username.
 """
 
+import builtins
 import io
+import keyword
 import os
+import re
 import tkinter as tk
 from tkinter import Canvas, ttk, messagebox
 import tkinter.filedialog as fd
@@ -11,6 +14,52 @@ from typing import Callable, List, Optional
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from PIL import Image, ImageTk
 from file_system_api import FileSystemApi
+
+
+def apply_syntax_highlighting(text_widget):
+    """Applies advanced syntax highlighting for Python code in a Tkinter Text widget."""
+    # Remove existing tags
+    for tag in text_widget.tag_names():
+        text_widget.tag_remove(tag, "1.0", tk.END)
+
+    patterns = {
+        "keyword": r"\b(" + "|".join(keyword.kwlist) + r")\b",  # Python keywords
+        "builtin": r"\b(" + "|".join(dir(builtins)) + r")\b",  # Built-in functions
+        "string": r"(['\"])(?:(?=(\\?))\2.)*?\1",  # Strings
+        "comment": r"#.*",  # Comments starting with #
+        "class": r"\bclass\s+(\w+)",  # Class definitions
+        "function": r"\bdef\s+(\w+)",  # Function definitions
+        "decorator": r"@\w+",  # Decorators
+        "numeric": r"\b\d+(\.\d+)?\b",  # Numeric literals
+    }
+
+    # Apply patterns
+    content = text_widget.get("1.0", tk.END)
+
+    for tag, pattern in patterns.items():
+        for match in re.finditer(pattern, content):
+            start, end = match.span(1 if tag in ["class", "function"] else 0)
+            start_index = f"1.0 + {start} chars"
+            end_index = f"1.0 + {end} chars"
+            text_widget.tag_add(tag, start_index, end_index)
+
+    # Configure tag styles
+    text_widget.tag_config("keyword", foreground="blue", font=("Helvetica", 10, "bold"))
+    text_widget.tag_config(
+        "builtin", foreground="purple", font=("Helvetica", 10, "italic")
+    )
+    text_widget.tag_config("string", foreground="green")
+    text_widget.tag_config("comment", foreground="gray", font=("Helvetica", 10))
+    text_widget.tag_config(
+        "class", foreground="dark orange", font=("Helvetica", 10, "bold")
+    )
+    text_widget.tag_config(
+        "function", foreground="dark green", font=("Helvetica", 10, "bold")
+    )
+    text_widget.tag_config(
+        "decorator", foreground="red", font=("Helvetica", 10, "italic")
+    )
+    text_widget.tag_config("numeric", foreground="brown", font=("Helvetica", 10))
 
 
 def set_window_to_center(root: tk.Tk) -> None:
@@ -336,17 +385,29 @@ class MainGUI:
     def _create_file_window(self, file_path: str) -> None:
         file_window = tk.Toplevel(self.root)
 
+        _, file_extension = os.path.splitext(file_path)
+
         file_window.title(file_path)
         text = tk.Text(file_window, width=40, height=10)
         text.pack(fill=tk.BOTH, expand=True)
 
+        if file_extension == ".py":
+            text.bind("<<Modified>>", lambda event: self.on_text_modified(text))
+
         text.insert(tk.END, self.client.read_file(file_path).decode())
+        if file_extension == ".py":
+            apply_syntax_highlighting(text)
         set_window_to_center(file_window)
 
         file_window.protocol(
             "WM_DELETE_WINDOW",
             lambda: self._close_file_window(file_window, text, file_path),
         )
+
+    def on_text_modified(self, text_widget):
+        """Handles the <<Modified>> event and reapplies syntax highlighting."""
+        text_widget.edit_modified(False)
+        apply_syntax_highlighting(text_widget)
 
     def _close_file_window(
         self, file_window: tk.Tk, text: tk.Text, file_path: str
